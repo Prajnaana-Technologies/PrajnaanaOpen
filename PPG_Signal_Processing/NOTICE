@@ -1,0 +1,62 @@
+PPG HR / HRV / RR / RRV tracker
+Copyright 2026 Prajnaana Technologies Pvt. Ltd.
+
+This product includes software developed at
+Prajnaana Technologies Pvt. Ltd. (https://prajnaanatech.com/).
+
+Original Author: Mamatha BV
+
+The signal-processing methods implemented here are drawn from published
+literature and cited at the point of use in the source. See CREDITS.md for the
+full reference list. Notable sources:
+
+  Elgendi M, et al.  PLoS ONE 8(10):e76585, 2013           (TERMA beat detector)
+  Karlen W, Ansermino JM, Dumont G.  EMBC 2012             (IMS beat detector)
+  Liang Y, et al.  Scientific Data 5:180076, 2018          (sample-path filter)
+  Fleming S, et al.  The Lancet 377:1011-1018, 2011        (rate bands by age)
+  Liu H, et al.  Physiol. Meas. 41:094001, 2020            (RR modulations)
+  Charlton PH, et al.  Physiol. Meas. 37:610-626, 2016     (RR fusion)
+  Task Force of the ESC/NASPE.  Circulation 93:1043, 1996  (HRV standards)
+
+DATA ATTRIBUTION
+----------------
+NO DATASET IS DISTRIBUTED WITH THIS SOFTWARE.  Attribution is given because the
+accuracy figures reported in docs/RESULTS.md were MEASURED ON these datasets,
+and both licences require a notice on works produced from the data --
+an obligation that follows from use, not from redistribution.
+
+Contains information from the BIDMC PPG and Respiration Dataset, made available
+under the Open Data Commons Attribution License v1.0:
+
+  Pimentel MAF, et al. "Towards a Robust Estimation of Respiratory Rate from
+  Pulse Oximeters." IEEE Trans. Biomed. Eng. 64(8):1914-1923, 2016.
+  doi:10.1109/TBME.2016.2613124
+
+Contains information from the MIMIC-III Waveform Database, made available under
+the Open Data Commons Open Database License v1.0:
+
+  Moody B, Moody G, Villarroel M, Clifford GD, Silva I. "MIMIC-III Waveform
+  Database (version 1.0)." PhysioNet, 2020. doi:10.13026/c2607m
+
+  Johnson AEW, Pollard TJ, Shen L, Lehman LH, Feng M, Ghassemi M, Moody B,
+  Szolovits P, Celi LA, Mark RG. "MIMIC-III, a freely accessible critical care
+  database." Scientific Data 3:160035, 2016.
+
+Both datasets are Open Access on PhysioNet:
+
+  Pollard T, Moody BE, Lehman L, Gow B, Fernandes C, Xie C, Johnson A,
+  Mark RG, Heldt T. "PhysioNet as a global platform for biomedical research."
+  Nature Health, 2026. doi:10.1038/s44360-026-00096-z
+
+Note on the ODbL share-alike term: it applies to a Derivative DATABASE.  This
+software is not a database derived from MIMIC-III, and no data is redistributed
+here, so the share-alike condition is not engaged and the Apache-2.0 licence of
+this source is unaffected.  Measured results are a Produced Work, for which the
+licence requires the attribution notice above and nothing more.
+
+NOT A MEDICAL DEVICE. This software is provided for research and engineering
+use. It has not been cleared or approved by any regulatory authority, and its
+outputs are not validated for clinical decision-making. See the accuracy and
+conformance limitations documented in docs/USER_GUIDE.md, and the figures behind
+them in docs/RESULTS.md -- in particular, HRV values are indicative and are not
+Task Force conformant at the sampling rates this code targets.

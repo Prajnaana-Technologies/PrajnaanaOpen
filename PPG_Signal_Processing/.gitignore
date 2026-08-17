@@ -1,0 +1,25 @@
+# Build artefacts
+ppg_analysis
+ppg_analysis_asan
+ppg_analysis_debug
+*.o
+
+# Run outputs -- the program writes these into the CURRENT WORKING DIRECTORY.
+# Run it from a scratch directory such as run/, not from here.
+ppg_analysis.csv
+RR_Data.csv
+INTP_RR_peak.csv
+INTP_RR_foot.csv
+INTP_RR_fm.csv
+*_ppg_analysis.csv
+*_RR_Data.csv
+
+# Local scratch output directories -- never publish these
+out/
+out1/
+out2/
+run/
+
+# Python bytecode, in case a helper script is run from the tree
+__pycache__/
+*.pyc
