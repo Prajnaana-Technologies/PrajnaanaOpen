@@ -288,8 +288,7 @@ filtered stream rather than adding a second filter.
 Scored against **beat-level ground truth** rather than aggregate rate. The BIDMC
 dataset carries simultaneous **ECG Lead II**, so R-peaks give a per-beat
 reference. That reference is itself validated before use, against the bedside
-monitor's own HR channel — the calibration and its check are described in
-[`RESULTS.md`](RESULTS.md).
+monitor's own HR channel.
 
 Matching uses a ±150 ms window, with the PPG-to-ECG offset chosen per recording
 to maximise matches — estimating pulse transit time from a nearest-neighbour
@@ -300,7 +299,7 @@ period away and silently aligns to the wrong beat.
 numbers". In short: **Se** is the fraction of true beats found, **PPV** the
 fraction of reported beats that are real, and **F1** their harmonic mean.
 
-**Caveats.** The R-peak reference is algorithmic (Pan-Tompkins style), validated
+**Caveats.** The R-peak reference is algorithmic, validated
 at aggregate HR against the monitor — the dataset has no manual beat
 annotations. Per-recording alignment offsets range from −104 to +552 ms, which is
 wider than physiological pulse transit time and suggests a timing offset in at

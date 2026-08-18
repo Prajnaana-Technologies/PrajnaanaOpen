@@ -89,10 +89,9 @@ source is unaffected.
 
 ### Accuracy metrics
 
-
-
 | term | meaning |
 |:---|:---|
+| **beat match** | a detected beat counts as correct when it falls within **±150 ms** of a reference R-peak from the ECG lead II channel supplied with the dataset, after per-recording lag alignment. `Se`, `PPV` and `F1` below are all computed on that criterion |
 | **MAE** | **mean absolute error** — average of \|estimate − reference\|, sign discarded. The headline accuracy number. Units are breaths/min for RR, ms for HRV |
 | **bias** | **mean signed error** — average of (estimate − reference). Negative means the estimator reads low. MAE and bias together separate "wrong on average" from "scattered" |
 | **MAPE** | mean absolute percentage error — MAE expressed as a fraction of the reference. Misleading at low rates, where a small absolute error is a large percentage |

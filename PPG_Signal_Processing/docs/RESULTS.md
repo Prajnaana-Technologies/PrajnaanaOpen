@@ -38,6 +38,10 @@ neonatal  ppg_analysis -i <rec> -nu 1     -c 0 -s neonate    # Karlen IMS
 
 ## Adult — 12 BIDMC/MIMIC recordings
 
+Beat detection is scored against the ECG lead II R-peak reference supplied with
+the dataset (±150 ms, per-recording lag alignment); respiratory rate against the
+manual breath annotations.
+
 **How the reference rate is built matters, and is stated here so the figures can
 be reproduced.** The reference is `60·(n−1)/(t_last − t_first)` over the
 annotated breaths inside the window — an interval rate. The obvious
@@ -232,8 +236,8 @@ On the neonatal pair the ranking reverses: IMS finds **96 %** of the expected
 beats against TERMA's 85–88 %, because it carries no window whose length must be
 a fraction of a cardiac cycle. That is why `-s neonate` dispatches to it.
 
-Both arms scored against the same calibrated ECG reference and the same
-interval-rate breath reference described above. IMS has the marginally higher
+Both arms scored against the same ECG beat reference and the same interval-rate
+breath reference. IMS has the marginally higher
 sensitivity but pays for it in precision, and those false beats propagate into
 the AM/BW/FM surrogates.
 
