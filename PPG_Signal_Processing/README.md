@@ -105,7 +105,7 @@ and why; the measurements behind them are in
 ## Measured performance
 
 Twelve annotated adult recordings from the BIDMC dataset. Beat detection scored
-against ECG lead II R-peaks (±150 ms); respiratory rate against manual breath
+against ECG lead II R-peaks; respiratory rate against manual breath
 annotations.
 
 **Every measured figure is in [`docs/RESULTS.md`](docs/RESULTS.md)** — respiratory
@@ -130,8 +130,9 @@ What the figures will tell you, in words:
   selected for them; on neonates the ranking reverses, which is why the choice is
   made at run time.
 
-**What the metrics mean** — `F1`, `MAE`, `within-2`, `coverage`, `settled` — is
-defined once in [`docs/DESIGN.md`](docs/DESIGN.md), under "Reading the numbers".
+**What the metrics mean** — `F1`, `MAE`, `within-2`, `coverage`, `settled`,
+`beat match` — is defined once in [`docs/DESIGN.md`](docs/DESIGN.md), under
+"Terms and abbreviations".
 The scope and limits of the testing are in *Scope* above.
 
 **Every duration quoted anywhere in this project is signal time** — seconds of
@@ -224,9 +225,9 @@ follows is stated so the figures are auditable rather than asserted: copy
 output-only line** printing each beat's peak index on the common tail of
 `ppg_on_peak()`, assert by content digest that this is the only difference,
 rebuild with `make strict`, run the fourteen recordings, and score beats
-against ECG lead II R-peaks (±150 ms, per-recording lag alignment) and
-respiratory rate against the manual breath annotations. The tree itself is
-never modified.
+against ECG lead II R-peaks and respiratory rate against the manual breath
+annotations, by the `beat match` criterion in [`docs/DESIGN.md`](docs/DESIGN.md).
+The tree itself is never modified.
 
 ## Acknowledgements
 

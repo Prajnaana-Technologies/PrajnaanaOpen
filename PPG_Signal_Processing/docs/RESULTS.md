@@ -8,8 +8,8 @@ correct in another.
 
 > **Timing convention — all durations are SIGNAL time**, seconds of recorded
 > signal consumed, never execution time. Metric definitions — `MAE`, `bias`,
-> `within-2`, `coverage`, `Se`, `PPV`, `F1`, `sub-harmonic` — are in
-> [`DESIGN.md`](DESIGN.md), "Terms and abbreviations".
+> `within-2`, `coverage`, `Se`, `PPV`, `F1`, `sub-harmonic`, and the `beat
+> match` criterion — are in [`DESIGN.md`](DESIGN.md), "Terms and abbreviations".
 
 ## Headline
 
@@ -39,8 +39,8 @@ neonatal  ppg_analysis -i <rec> -nu 1     -c 0 -s neonate    # Karlen IMS
 ## Adult — 12 BIDMC/MIMIC recordings
 
 Beat detection is scored against the ECG lead II R-peak reference supplied with
-the dataset (±150 ms, per-recording lag alignment); respiratory rate against the
-manual breath annotations.
+the dataset, by the `beat match` criterion defined in [`DESIGN.md`](DESIGN.md);
+respiratory rate against the manual breath annotations.
 
 **How the reference rate is built matters, and is stated here so the figures can
 be reproduced.** The reference is `60·(n−1)/(t_last − t_first)` over the

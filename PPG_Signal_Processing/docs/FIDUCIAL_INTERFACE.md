@@ -290,13 +290,14 @@ dataset carries simultaneous **ECG Lead II**, so R-peaks give a per-beat
 reference. That reference is itself validated before use, against the bedside
 monitor's own HR channel.
 
-Matching uses a ±150 ms window, with the PPG-to-ECG offset chosen per recording
+Matching uses the `beat match` window defined in [`DESIGN.md`](DESIGN.md)
+("Terms and abbreviations"), with the PPG-to-ECG offset chosen per recording
 to maximise matches — estimating pulse transit time from a nearest-neighbour
 distribution does not work, because it is contaminated by adjacent beats one
 period away and silently aligns to the wrong beat.
 
-**Metric definitions** are in [`DESIGN.md`](DESIGN.md), under "Reading the
-numbers". In short: **Se** is the fraction of true beats found, **PPV** the
+**Metric definitions** are in [`DESIGN.md`](DESIGN.md), under "Terms and
+abbreviations". In short: **Se** is the fraction of true beats found, **PPV** the
 fraction of reported beats that are real, and **F1** their harmonic mean.
 
 **Caveats.** The R-peak reference is algorithmic, validated
