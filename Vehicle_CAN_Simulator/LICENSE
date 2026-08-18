@@ -1,6 +1,6 @@
-MIT License
+# MIT License
 
-Copyright (c) 2026 Prajnaana Technologies
+Copyright (c) 2026 Prajnaana Technologies Pvt. Ltd.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -19,3 +19,30 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+
+## ADDITIONAL NOTICES  (these do not modify the MIT terms above)
+
+**SAFETY**
+
+    This Software is a simulation and test tool. It is not intended for use
+    in safety-critical systems, in certification or homologation, or in or on
+    any vehicle operated on public roads. It transmits data on a CAN bus and
+    must not be connected to a vehicle in motion, or to any system where a
+    malfunction could cause injury or damage.
+
+**THIRD-PARTY COMPONENTS**
+
+    This Software includes components licensed by third parties under their
+    own terms, including material from the opendbc project (MIT),
+    OpenStreetMap (ODbL), Open-Meteo (CC-BY 4.0) and python-can (LGPL-3.0).
+    Those components remain governed by their respective licences, which are
+    not superseded by the MIT licence above. See CREDITS.txt.
+
+**TRADEMARKS**
+
+    Vehicle manufacturer names appearing in this Software are trademarks of
+    their respective owners and are used solely to identify which CAN signal
+    layout is being simulated. This licence grants no rights in any
+    trademark. This Software is not affiliated with, authorised by, or
+    endorsed by any vehicle manufacturer.
