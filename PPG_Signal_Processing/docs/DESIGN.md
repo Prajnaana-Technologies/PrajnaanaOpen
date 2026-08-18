@@ -1,8 +1,7 @@
 # Design notes
 
-Why the algorithm is built the way it is: the decision behind each choice, the
-measurement that justifies it, and — equally — what was tried and rejected, with
-the numbers that ruled it out.
+Why the algorithm is built the way it is: the decision behind each choice and
+the measurement that justifies it.
 
 **Measured results are not here.** Every figure describing how the shipped build
 performs lives in [RESULTS.md](RESULTS.md), which is the one file to update when
@@ -11,7 +10,7 @@ the algorithm is tuned.
 **Those measurements are dated experiments, and must be read as such.** An A/B
 table here records what was seen *when that comparison was run*, on the build of
 the day. Only the comparison *within* a table is meaningful — the option chosen
-against the options rejected. The absolute levels are not the current build's
+against the alternative measured. The absolute levels are not the current build's
 performance and will not track it: later work moved them, and nobody re-runs a
 settled experiment to keep its baseline column fresh. **For what the shipped
 build does today, and only there, see [RESULTS.md](RESULTS.md).**
@@ -368,64 +367,40 @@ window buys frequency resolution at the cost of update rate; at neonatal rates
 32 s would still contain 16–42 breaths, so this is a trade rather than a
 requirement.
 
-### The FM prior — built, measured, and REMOVED
+### FM is the weakest surrogate on adults in this corpus
 
 Liu's central result is that FM is physiologically the strongest modulation.
-Fusion here is purely data-driven and carried no such prior, so a weight was
-added that multiplied FM's measured prominence before gating, ranking and
-weighting. Measured over the two **neonatal** recordings:
-
-| weight | err `neonatal_mimic_data1` | err `neonatal_mimic_data2` | mean err | mean smoothed-std | FM chosen best |
-|---:|---:|---:|---:|---:|---:|
-| 1.0 (off) | 2.01 | 0.24 | 1.12 | 2.21 | 33 % |
-| 1.25 | 1.52 | 0.10 | 0.81 | 3.76 | 47 % |
-| 1.5 | 0.59 | 0.10 | **0.35** | 3.80 | 61 % |
-| 2.0 | 0.41 | 0.10 | 0.25 | 4.28 | 74 % |
-| 3.0 | 0.10 | 0.10 | **0.10** | 4.42 | 91 % |
-| 5.0 | 0.11 | 1.36 | 0.73 | 5.04 | 100 % |
-
-Accuracy improved **monotonically and on both recordings** up to 3.0. On this
-evidence a weight of 1.5 was briefly adopted, with the caveat that two
-recordings cannot justify a value.
-
-**That caveat proved to be the whole story, and the prior was removed.**
-
-Re-tested on the 12 annotated adult recordings of the BIDMC dataset (run with
-`-nu 10000`), scored window-by-window against the monitor's own `RESP` channel
-from the BIDMC numerics — a measured reference rather than a derived one:
-
-| weight | MAE | bias | windows within 2/min | subharmonic (≈½ true rate) |
-|---:|---:|---:|---:|---:|
-| **no prior (shipped)** | **4.71** | −4.54 | **48 %** | 28 % |
-| 1.5 | 5.09 | −4.92 | 43 % | 30 % |
-| 2.0 | 5.35 | −5.18 | 41 % | 31 % |
-| 3.0 | 5.74 | −5.57 | 35 % | 32 % |
-
-Monotonically **worse** — the exact reverse of the neonatal result. The cause is
-visible in the per-surrogate agreement with the reference:
+That is not what this corpus shows for the adult recordings, and the difference
+matters to anyone re-tuning the fusion.
 
 | surrogate | median ref/est | within ±15 % | at ≈½ the true rate |
 |:---|---:|---:|---:|
 | BW | **1.04** | **71 %** | 8 % |
 | AM | 1.08 | 58 % | 24 % |
-| **FM** | **1.54** | **30 %** | **29 %** |
+| **FM** | 1.39 | 35 % | 20 % |
 
-On this cohort **FM is the worst surrogate, not the best.** Liu's finding was
-obtained with a different FM definition — intervals between *maximal-slope*
-points after a per-cycle detrend — whereas ours is peak-to-peak IBI. At adult
-heart rates (75–98 bpm here, against ~150 in the neonatal pair) a 65.5 s window
-holds roughly 100 real IBI samples instead of ~165, and the interpolated series
-subharmonic-locks.
+**Why, and it is a rate effect.** A 65.5 s window holds roughly 100 real
+FM samples at the 75–98 bpm of these recordings against ~165 at the ~150 bpm of
+the neonatal pair, and the interpolated series subharmonic-locks as the sample
+count falls. The ranking therefore reverses with the population, and a fusion
+prior that amplifies FM would amplify the pipeline's weakest input exactly where
+it is weakest. Fusion here stays purely data-driven for that reason.
 
-The lesson is not that Liu is wrong; it is that **a prior must not amplify a
-surrogate this pipeline currently computes badly.** Re-evaluate the prior only
-after Liu's FM definition is implemented.
+The FM implemented is Liu's own definition — intervals between maximal-upslope
+points, not peak-to-peak IBI — described under "Liu's FM definition, implemented
+and measured" below.
 
-### The larger problem this exposed: systematic underestimation on adults
+### Subharmonic locking on adults, and the three changes that answered it
 
-Even with the prior off, the cohort shows **MAE 4.71 and bias −4.54 /min, with
-the bias negative on all 12 recordings** (−0.70 to −11.15). 28 % of fused windows
-sit at approximately half the reference rate.
+> **The figures in this subsection are from the build of the day and are scored
+> against the monitor's own 1 Hz `RESP` channel, not against the manual breath
+> annotations every shipped figure uses.** They are here to explain why three
+> mechanisms exist, not to describe current accuracy. For that see
+> [RESULTS.md](RESULTS.md), where settled RR is **MAE 0.42 /min**.
+
+At the time, the cohort showed MAE 4.71 and bias −4.54 /min with the bias
+negative on all 12 recordings (−0.70 to −11.15), and 28 % of fused windows
+sitting at approximately half the reference rate.
 
 This did not show up on the neonatal pair because the infant band starts at
 20 /min, which structurally forbids a subharmonic of a 28 /min rate. The adult
@@ -434,7 +409,7 @@ inside the search range. This is the same family of failure as the earlier
 low-frequency contamination and band-edge defects, re-exposed by a population
 they were never tested against.
 
-Three remedies were identified at the time, and all three were pursued:
+Three remedies were identified, and **all three are in the shipped build**:
 
 1. **Liu's FM definition** (maximal-slope/PIM) — addresses the worst surrogate
    directly, and is a prerequisite for revisiting the prior. *Implemented; see
@@ -1543,13 +1518,10 @@ Rows emitted before the window fills are marked **`_PROV`** in the `Method`
 column. The CSV column set is settled, so the distinction goes in a column whose
 vocabulary is already a set of names, not in a new field.
 
-**Two alternatives were measured and rejected.** *Zero-padding* a short record
-up to the full length quarters the bin spacing while leaving resolution where
-the data put it — the −3 dB main lobe is 5.49 /min padded against 2.75 /min for
-a genuinely full record — so it reports false precision. *Oversampling the
-surrogate grid* to 32 ms measured **identical** to 64 ms at matched segment
-duration (MAE 0.85 both ways), for twice the samples: seconds carry the
-information, samples do not.
+**Resolution comes from duration, not from sample count.** Zero-padding widens
+nothing real — the −3 dB main lobe is 5.49 /min padded against 2.75 /min for a
+genuinely full record — and a 32 ms surrogate grid measures identical to 64 ms at
+matched segment duration. Seconds carry the information; samples do not.
 
 ### 2. Cross-window spectral averaging
 
@@ -1707,47 +1679,6 @@ unaffected either way. Three honest routes, none taken:
    every recording and was derived, not swept.
 3. Leave it, with this note.
 
-## Two proposals measured and rejected
-
-**A 32 ms surrogate grid instead of 64 ms.** Finer bins do not come from more
-samples — `bin = 1/T_segment`. Holding the FFT at 1024 points while halving the
-sample interval makes that segment span 16.4 s instead of 32.8 s, so the bins get
-twice as COARSE. Holding the duration instead (segment 2048) gives the identical
-1.83 /min bin for twice the compute. Measured at matched duration, against the
-shipped configuration: cohort MAE improves by **0.03 /min**, but **coverage
-drops 6 percentage points** and **`bidmc_05` more than doubles its error**, with
-nine of twelve recordings the same or worse. The apparent MAE gain is an
-artefact of twice as many rows — the slide is 128 *points*, which at 31.25 Hz
-is 4.1 s rather than 8.2 s. The real damage is the warm-up ladder, which also
-counts in points: every stage becomes half as long and twice as coarse, so the
-harmonic guard's tracker is established on worse early values.
-
-**One 4–66 /min band for every patient, dropping the subject type.** Measured on
-adults, against the shipped configuration: settled MAE **nearly doubles**,
-coverage **drops 20 percentage points**, reports above 1.5× the reference rise
-by a factor of roughly **28**, and one recording's error grows **more than
-twentyfold** because its 2nd harmonic at ~31 /min is now inside the band.
-Harmonic ambiguity exists wherever `2f <= f_hi`; at a 30 /min ceiling that
-touches only subjects below 15 /min, at 66 /min it touches every normal adult.
-
-There is also a limit that does not depend on this cohort. **The surrogates are
-sampled once per beat**, so they cannot represent any rate above half the heart
-rate:
-
-| heart rate | surrogate Nyquist | 66 /min ceiling usable? |
-|---:|---:|:---|
-| 43 bpm | 22 /min | no — aliased |
-| 75 bpm | 38 /min | no — aliased |
-| 104 bpm | 52 /min | no — aliased |
-| 150 bpm | 75 /min | **yes** |
-
-The declared adult heart-rate band is 43–104 bpm, giving a surrogate Nyquist of
-21.5–52 /min, so a 66 /min ceiling is above it for every adult in range. The
-neonatal band works precisely because neonatal hearts run 90–181 bpm. **The band
-ceiling is not a configuration preference — it is the sampling theorem applied
-to a beat-sampled surrogate, and it is why the patient type cannot be
-eliminated.**
-
 ## The anchor must not be a band-edge peak
 
 **Found by asking why one recording took 69 s to say anything.**
@@ -1785,34 +1716,21 @@ edge-pinned the original choice stands, because then there is nothing better.
 decimal places. Coverage moves 91 % → 90 % (one row), because five rows shift
 from settled to provisional when the recording starts reporting earlier.
 
-### Why the slow breather still waits 82.8 s, and what was rejected
+### Why the slow breather still waits 82.8 s
 
-bidmc_05 has a different cause and remains OPEN. Its three surrogates lock onto
-DIFFERENT harmonics of the true 6 /min — 2.8f, 4.0f, 4.5f — so they never
-corroborate each other, while the breath count reads **7.49 from 34.5 s
-onward**. The correct answer exists early; the harmonic rescues are disabled
-during warm-up (the raised floor makes their ratio test invalid), so it cannot
-be used until the window fills.
+bidmc_05 remains OPEN. Its three surrogates lock onto DIFFERENT harmonics of the
+true 6 /min — 2.8f, 4.0f, 4.5f — so they never corroborate each other, while the
+breath count reads **7.49 from 34.5 s onward**. The correct answer exists early;
+the harmonic rescues are disabled during warm-up (the raised floor makes their
+ratio test invalid), so it cannot be used until the window fills.
 
-Two ways to exploit it were built and **measured as bad trades**:
-
-| | bidmc_05 1st | cohort MAE | bidmc_05 MAE | bidmc_01 MAE |
-|:---|---:|---:|---:|---:|
-| **adopted** | 82.8 s | **0.42** | **1.02** | **0.21** |
-| consensus anchoring | 74.9 s (*wrong*, 23.5) | 0.49 | 1.94 | 0.23 |
-| consensus + warm-up rescue | 34.5 s | 0.47 | 2.20 | 0.92 |
-
-Anchoring on the CONSENSUS instead of the most prominent surrogate — the
-obvious generalisation of the rule above — reintroduces exactly what the
-sub-harmonic rescue's own note warns against: *AM and BW are both amplitude
-surrogates of the same waveform, so baseline wander corrupts them TOGETHER, and
-a majority vote reads their agreement as confirmation rather than as one piece
-of evidence counted twice.* On bidmc_05 they agree on a harmonic, and its MAE
-nearly doubles.
-
-The band-edge rule is narrower and survives that objection: it removes a
-surrogate from consideration on the grounds that **its own peak is
-unresolvable**, not on the grounds that the others outvote it.
+The band-edge rule above is what applies here: it removes a surrogate on the
+grounds that **its own peak is unresolvable**, not on the grounds that the others
+outvote it. Anchoring on the consensus instead would reintroduce what the
+sub-harmonic rescue's own note warns against — AM and BW are both amplitude
+surrogates of the same waveform, so baseline wander corrupts them TOGETHER, and a
+majority vote reads their agreement as confirmation rather than as one piece of
+evidence counted twice.
 
 ## Harmonic guard by sequential tracking
 
@@ -2331,13 +2249,11 @@ costs those figures **nothing** — 0.42, 99 %, the same 570 settled rows.
 | band only | 0.48 | 98 % | 558 | 88 / 76 | 3.72 |
 | band + local | 0.47 | 98 % | 557 | 79 / 82 | 2.22 |
 
-**A per-category switch was considered and rejected.** The gains sit on the
-noisier recordings and the cost on the clean ones, which invites conditioning
-the behaviour on `-s`. That would be fitting an incidental property of this
-data: what separates the two groups is the **repair rate**, not the patient
-type, and on a noisy adult wearable or a clean neonatal trace the category would
-point the wrong way. Finding the real confound — band test versus local test —
-removed the need for the switch entirely.
+**The gate is not conditioned on `-s`.** What separates the noisier recordings
+from the clean ones is the **repair rate**, not the patient type, so on a noisy
+adult wearable or a clean neonatal trace the category would point the wrong way.
+The discriminator is the band test versus the local test, which applies to every
+subject alike.
 
 **Deleting a vertex is not deleting a sample.** [MATEO] argues against deletion
 for HRV spectra because it shortens the series. Here the surrogates are
@@ -2418,9 +2334,8 @@ pulse. The systolic/dicrotic labelling assumes the reference rate is correct;
 the perfusion index and the band arithmetic above do not.
 
 > **This will be addressed in an upcoming release.** It is not closed in this
-> one. What that costs a reader of the output is set out below, along with every
-> repair that was implemented and measured and the reason each was rejected, so
-> that the next attempt starts from evidence rather than from the beginning.
+> one. What that costs a reader of the output, and what a fix has to do, are set
+> out below.
 
 **What IS done about it, and it is what the source algorithms prescribe.** Both
 detectors carry their authors' own defence against counting a dicrotic wave as a
@@ -2488,25 +2403,6 @@ rise it follows.
 cycle emits a steady train of half-length intervals, which is arithmetically
 identical to a heart beating twice as fast. Any rule written on intervals alone
 must either accept both or reject both.
-
-**Thirteen candidate repairs have been implemented or measured, and none is
-good enough to ship:**
-
-| attempt | result |
-|:---|:---|
-| amplitude gate on peak-minus-foot | detected **nothing** — in a doubled train the foot search starts at the previous *emitted* peak, so a systolic beat following a notch is measured from the notch's shallow trough and looks as small as the notch |
-| amplitude gate on the detector's own band-pass peak height | partial: one recording corrected 170 → 86, but others moved only part of the way (144 → 107) and one that was right moved (154 → 166) |
-| the same gate, in the shared layer, applied to both detectors | same partial behaviour; one recording over-corrected to 61 against a spectral estimate of 75 |
-| spectrum arms the repair, amplitude executes it | detection fired on only 2 of 3 tested; repair still partial |
-| upper-quartile amplitude rule, threshold chosen by replaying real beat streams | the replay predicted 150 → 85, 170 → 94, 156 → 83 with both controls untouched; the built code produced 107, 86 and 61. Suppressing a beat changes the detector's own bookkeeping, so the candidate stream is not the one the replay assumed |
-| the same slope-comparability rule, scored over the **whole** cohort rather than three recordings | over-reads above 1.5 × reference fall 11 → 8, but cohort MAE rises **22.2 → 30.1** /min and **6 of the 38 recordings the detector already reads correctly are broken** — one 131 → 250, one 160 → 27, one 163 → 82. Only 2 of 11 over-reads are corrected. This is measured in replay, the setting most favourable to the rule, and it still loses more than it gains |
-| a bare threshold on **rise duration** — the valley-to-peak interval | does not separate. Over all candidate rises, doubled recordings run p10 40–48 ms, median 72–88, p90 152–176; undisputed recordings run p10 16–120, median 96–128, p90 104–136. The successive-pair duration ratio an alternation test would key on is 0.64–0.76 on doubled recordings and 0.19–0.94 on undisputed ones, so the doubled range sits **inside** the undisputed range |
-| **emission-time** amplitude band in the segmentation detector — reject a validated up-slope whose amplitude falls below the adaptive lower threshold | the mechanism is right and the trade is fatal. Scored against ECG with the twelve annotated adults forced through this detector, PPV rises **95.0 → 99.7**, which is the notch detections being struck; but sensitivity falls **98.4 → 93.5** and F1 does not move (96.6 → 96.5, worst 87.0 → 85.8). One recording loses a quarter of its real beats. On the short cohort it corrects 3 of the 5 confirmed doublings and **breaks 4 recordings that were right**, one of them 192 → 92 — the same factor-of-two error, inverted |
-| **W1/W2 re-derived from the detector's own measured beat interval** — Elgendi's W2 *is* the one-beat duration, so a measurement should beat the declared band | **inert where it is needed.** The re-tune never fires on a single affected recording: it requires eight consecutive intervals agreeing to 20 %, and on a doubled train the intervals never settle — the train is erratic, not a clean half-rate. Removing the spectral confirmation entirely does not change that, so the confirmation is not the blocker. Where it *does* fire, on recordings that are already right, it costs respiratory accuracy: settled MAE 0.42 → 0.47, coverage 570 → 523 rows, and the slow-breathing record 1.02 → 2.07. **A measurement taken from the beat stream cannot correct the beat stream** |
-| the same windows, with the period measured from the buffered **signal** instead — a Goertzel sweep over the plausibility envelope, which no detector decision has touched | cannot resolve the fundamental *in the space available*. The sample-path filter runs from `BP_HP_CORNER_HZ` = 0.02 Hz and deliberately keeps respiration, because the BW surrogate is built from that wander — so breathing is in the buffer. With a loose octave preference the search descends into it and settled on **22 /min**; with a strict one it stays on the second harmonic and the reported rates get *worse* (one recording 138 → 166). Over a 1024-sample ring the frequency resolution is ≈7 /min, and the gap between the respiratory ceiling of 66 /min and a bradycardic pulse at 69 /min is smaller than that |
-| a **refractory against a cardiac period measured over a long window**, applied to every candidate — the measurement being the one described below, which no beat decision has touched | the best cohort result so far and still not shippable. Cohort MAE **22.4 → 15.4**, over-reads 11 → 7, the twelve annotated adults byte-identical. But it is another per-candidate veto: it **broke one correct recording** (163 → 122) and cost a neonatal *reference* recording 151 beats and a third of its respiratory coverage. Measured cohort-wide, the fraction of intervals it would reject is ≤10 % on 34 of 37 correct recordings but reaches 19–29 % on three, and those three are exactly the damage |
-| the same refractory, applied only to a train a **per-recording classifier** has identified as doubled — the fraction of candidate intervals falling below it, which separates ≤29 % from ≥78 % where no single interval does | safe, and insufficient. **Breaks nothing**: 0 of 68 damaged, and all 14 reference recordings byte-identical including the neonatal pair. Cohort MAE 22.4 → 18.7, over-reads 11 → 9. But it under-corrects the recordings it exists for — the five confirmed doublings move only from ≈2× to ≈1.4× (101, 115, 135, 180, 132 against 69, 73, 83, 78, 81), which is a *less* detectable error than the clean factor of two it replaces. Two implementation traps, both measured: a sliding window arms on local bursts and must be cumulative, and intervals below the 240 ms physiological limit must be excluded from the fraction or noise spikes arm it |
-| the same guard **plus adapting the band only on validated beats**, to remove the bootstrap contamination above | catastrophic lockout. Sensitivity **98.4 → 85.9** and worst F1 **87.0 → 1.6**; one recording falls from 730 detected beats to 18, another from 740 to 7. Rejecting a beat withholds the very adaptation that would have widened the threshold again, so the band narrows monotonically until nothing passes. Algorithm 2 depends on adapting to *every* classified up-slope; making adaptation conditional on acceptance makes it self-reinforcing |
 
 A partial repair is worse than none: it converts a rate that is cleanly wrong by
 a factor of two into one that is wrong by an unpredictable amount, which no
@@ -2758,7 +2654,7 @@ count backing each row, and is now documented as such.
 
 ### Why the values are qualified rather than suppressed
 
-Suppressing HRV entirely at 125 Hz was considered and rejected on the source.
+HRV is qualified rather than suppressed at 125 Hz, and the sources say why.
 `[TASKFORCE]` recommends 250–500 Hz, but `[SHAFFER]` (Shaffer & Ginsberg,
 *Front. Public Health* 5:258, 2017) qualifies it: "a sampling rate of 125 Hz …
 may be sufficient when RSA amplitude is normal", while "a minimum sampling

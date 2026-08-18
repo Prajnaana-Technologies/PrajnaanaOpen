@@ -90,12 +90,6 @@ detector windows, 1/f whitening, the agreement gate, the warm-up schedule and
 more. Each is marked `DEVELOPER'S IMPROVEMENT` at the point it is defined, and
 they are listed in [`CREDITS.md`](CREDITS.md).
 
-**Negative results are documented, not buried.** The engineering notes record
-what was tried and rejected with the numbers that killed it: coarser FFT bins for
-sub-harmonic rejection, a drift-gated spectral average, consensus anchoring, four
-separate discriminators for an HRV artefact. Knowing which roads are closed is
-worth as much as knowing which are open.
-
 **Limitations are stated, not disclaimed.** Each one below says what it bounds
 and why; the measurements behind them are in
 [`docs/RESULTS.md`](docs/RESULTS.md).
@@ -199,7 +193,7 @@ behind them are in [`docs/RESULTS.md`](docs/RESULTS.md) and the reasoning in
 |:---|:---|
 | [`docs/RESULTS.md`](docs/RESULTS.md) | **every measured figure, in one place** — the authoritative source when the algorithm is tuned |
 | [`docs/ppg_arch.md`](docs/ppg_arch.md) | module map and how a sample flows through the pipeline |
-| [`docs/DESIGN.md`](docs/DESIGN.md) | the engineering record — every design decision, its measurement, and what was rejected |
+| [`docs/DESIGN.md`](docs/DESIGN.md) | the engineering record — every design decision and the measurement that justifies it |
 | [`docs/FIDUCIAL_INTERFACE.md`](docs/FIDUCIAL_INTERFACE.md) | the beat-detector contract — the detector is the one pluggable stage, so it is the one with a normative interface |
 | [`docs/USER_GUIDE.md`](docs/USER_GUIDE.md) | how to build and run it, every option, and how to read the output |
 | [`CREDITS.md`](CREDITS.md) | every research paper and dataset used, with DOI links, and the people who contributed |

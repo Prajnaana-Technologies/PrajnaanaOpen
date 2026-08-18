@@ -160,9 +160,8 @@ against.** It now reports 67 % of its windows at MAE 1.02 and 95 % within-2,
 against 32 % / 2.93 / 61 % before the harmonic guard. Its first report is still
 82.8 s. Part of that is physics — 16–33 s of data cannot contain a 6 /min rate
 at any FFT length — and part is that its surrogates lock onto three different
-harmonics, so they never corroborate one another. Both routes out of that were
-measured and rejected; see [`DESIGN.md`](DESIGN.md), "Why the slow breather
-still waits 82.8 s".
+harmonics, so they never corroborate one another. See [`DESIGN.md`](DESIGN.md), "Why the slow
+breather still waits 82.8 s".
 
 **bidmc_02 reports at 34.8 s, and that is a design choice rather than physics.**
 Anchoring the fusion on a band-edge peak would delay it to 69.1 s — slower than
