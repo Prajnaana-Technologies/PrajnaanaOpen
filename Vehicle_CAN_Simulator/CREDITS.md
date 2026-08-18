@@ -7,7 +7,7 @@ require that they be credited. This file does that.
 Nothing in this file limits your use of AI Vehicle CAN Simulator.
 
 
- 1. ## **CAN DATABASES**
+## 1. CAN DATABASES
 
 ### opendbc (comma.ai) 
 

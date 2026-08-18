@@ -1,4 +1,4 @@
-# MIT License
+MIT License
 
 Copyright (c) 2026 Prajnaana Technologies Pvt. Ltd.
 
@@ -21,9 +21,9 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 
-## ADDITIONAL NOTICES  (these do not modify the MIT terms above)
+ADDITIONAL NOTICES  (these do not modify the MIT terms above)
 
-**SAFETY**
+SAFETY
 
     This Software is a simulation and test tool. It is not intended for use
     in safety-critical systems, in certification or homologation, or in or on
@@ -31,7 +31,7 @@ SOFTWARE.
     must not be connected to a vehicle in motion, or to any system where a
     malfunction could cause injury or damage.
 
-**THIRD-PARTY COMPONENTS**
+THIRD-PARTY COMPONENTS
 
     This Software includes components licensed by third parties under their
     own terms, including material from the opendbc project (MIT),
@@ -39,7 +39,7 @@ SOFTWARE.
     Those components remain governed by their respective licences, which are
     not superseded by the MIT licence above. See CREDITS.txt.
 
-**TRADEMARKS**
+TRADEMARKS
 
     Vehicle manufacturer names appearing in this Software are trademarks of
     their respective owners and are used solely to identify which CAN signal
