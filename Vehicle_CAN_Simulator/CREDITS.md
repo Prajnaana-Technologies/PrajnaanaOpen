@@ -1,6 +1,5 @@
-================================================================
  VEHICLE AI SIMULATOR - CREDITS AND THIRD-PARTY NOTICES
-================================================================
+
 
 This program includes work created by other people. Their licences
 require that they be credited. This file does that.
@@ -8,9 +7,7 @@ require that they be credited. This file does that.
 Nothing in this file limits your use of AI Vehicle CAN Simulator.
 
 
-================================================================
  1. CAN DATABASES
-================================================================
 
 --- opendbc (comma.ai) -----------------------------------------
 
@@ -58,9 +55,8 @@ databases. Real manufacturer databases are proprietary and are
 NOT included here.
 
 
-================================================================
  2. MAP AND ROAD DATA
-================================================================
+
 
 --- OpenStreetMap ----------------------------------------------
 
@@ -82,9 +78,7 @@ Live weather and ground elevation are provided by Open-Meteo.
     Licence: CC-BY 4.0
 
 
-================================================================
  3. SOFTWARE LIBRARIES
-================================================================
 
     Library            Version    Licence
     ---------------------------------------------------
@@ -138,9 +132,7 @@ This reproduces the application with your version of the library
 substituted. If you cannot obtain the source, contact Prajnaana Technologies Pvt. Ltd. and it will be provided.
 
 
-================================================================
  4. TRADEMARKS
-================================================================
 
 Vehicle manufacturer names used in this program - including but
 not limited to Tesla, Toyota, Hyundai, Kia, Tata, Mahindra,
@@ -155,15 +147,11 @@ THIS PROGRAM IS NOT AFFILIATED WITH, AUTHORISED BY, SPONSORED BY,
 OR ENDORSED BY ANY VEHICLE MANUFACTURER.
 
 
-================================================================
  5. PEOPLE
-================================================================
 
-Dhanya Shree S - original author; design and implementation.
+**Dhanya Shree S** - original author; design and implementation.
 
 Copyright (c) 2026 Prajnaana Technologies Pvt. Ltd. - see LICENSE.
 
 
-================================================================
  End of credits.
-================================================================
