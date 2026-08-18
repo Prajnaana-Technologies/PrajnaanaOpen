@@ -415,17 +415,16 @@ out.
 
 ## Limits worth knowing before you rely on the numbers
 
-- **A pronounced dicrotic wave can make the reported heart rate exactly twice
-  the truth.** This is the one to know about, because it is silent: doubling a
-  bradycardic patient lands *inside* the expected range, so no warning prints
-  and the row looks healthy. If a reported HR is close to twice a rate you would
-  expect for the patient, distrust it — and check that `-s` matches the subject,
-  because the failure is concentrated where the declared patient type does not.
-  Measured on 5 of 68 short recordings, with at least 9 of 58 reading high. Both
-  source detectors' own defences against it are implemented; they are not
-  sufficient at this operating point. **This will be addressed in an upcoming
-  release.** Mechanism and evidence: [`DESIGN.md`](DESIGN.md), "Dicrotic
-  doubling".
+- **The reported heart rate can come out at exactly twice the truth.** This is
+  the one to know about, because it is silent: doubling a bradycardic patient
+  lands *inside* the expected range, so no warning prints and the row looks
+  healthy. If a reported HR is close to twice a rate you would expect for the
+  patient, distrust it — and **check `-s` first**, because that is the dominant
+  cause. Across 68 short recordings analysed under a single declared category,
+  11 of the 58 with a reference read high; re-declaring each to the category its
+  rate belongs to removed 9 and broke none. Two remained, inside the correct
+  band. **This will be addressed in an upcoming release.** Evidence:
+  [`DESIGN.md`](DESIGN.md), "Dicrotic doubling".
 - **HRV is indicative, not standard-conformant.** The window is 300 beats — 173
   to 418 s depending on rate — against the 300 s short-term standard, which it
   therefore straddles rather than satisfies.

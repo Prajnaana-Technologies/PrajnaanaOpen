@@ -2206,7 +2206,7 @@ is not shipped.
 ## The category band is a prior, not a gate
 
 Found by sweeping 68 short MIMIC-III Waveform recordings (7441 samples each,
-one of them 7442 = 59.5 s at 125 Hz, cohort median HR 153 → neonatal).
+one of them 7442 = 59.5 s at 125 Hz, cohort median HR 154 → neonatal).
 
 `sanitize_ibi()` rejected any interval outside the declared category's
 heart-rate band. That band is a **Fleming 2011 centile range** — it describes
@@ -2287,13 +2287,15 @@ second peak to count, it puts the first autocorrelation peak at the half-period,
 and it can make the second harmonic the strongest bin. Three estimators that
 fail the same way are not three estimators, so agreement is evidence, not proof.
 
-**And the same notch defeats this analyser, on 5 of the 68.** That is measured,
-not suspected: on those recordings the detected peaks alternate large-small with
-a median small/large amplitude ratio of 0.34-0.57, against 0.90-0.95 on
-recordings where the rate is not in dispute -- the signature of a notch being
-counted as a beat -- and the cardiac spectrum carries 2-13x more power at half
-the reported rate than at the reported rate. See "Dicrotic doubling — an open
-defect" below.
+**And this analyser reads high on the same kind of recording.** The spectral
+evidence is the durable part: on those recordings the cardiac spectrum carries
+2-13x more power at half the reported rate than at the reported rate. The
+amplitude statistic once quoted alongside it -- a median small/large ratio of
+0.34-0.57 over successive pairs -- is a min/max ratio, so it is <= 1 by
+construction and cannot say WHICH of the pair is the systolic peak; measured
+with the pairs labelled, the second peak is not reliably the smaller. See
+"Dicrotic doubling — an open defect" below, which also shows that most of this
+is a declared-subject mismatch rather than a notch.
 
 The per-record reference values are retained with the sweep rather than
 re-derived, because a reference rebuilt to a slightly different recipe is a
@@ -2349,11 +2351,71 @@ build-time overridable so the table above can be reproduced rather than believed
 
 ### Dicrotic doubling — an open defect
 
-**This analyser over-reads the heart rate on at least 9 of the 58 short
-recordings that have a resolved reference — five of them confirmed as exact
-doublings.** It is stated here because a rate that is exactly twice the truth,
-sitting inside the expected band, is the most dangerous thing this program can
-report.
+**With one subject category declared for the whole cohort, this analyser
+over-reads the heart rate on 11 of the 58 short recordings that have a resolved
+reference. Declaring the category each recording's rate actually belongs to
+removes 9 of those 11 and introduces none, leaving 2.** It is stated here
+because a rate that is exactly twice the truth, sitting inside the expected
+band, is the most dangerous thing this program can report.
+
+**The dominant cause is a declared-subject mismatch, not waveform morphology.**
+The cohort sweep declares `-s neonate` for all 68 recordings, expected HR
+90–181 /min. Ten of the 58 with a resolved reference have a reference rate
+*outside* that band — 54 to 84 /min — and every one falls inside the adult band
+of 43–104. Told to expect a rate the subject does not have, the detector rejects
+the true interval and locks onto a periodicity that fits the declared band.
+
+Re-running each recording under the category its reference falls in reassigns 12
+of the 68, all to `adult`:
+
+| recording | reference | `-s neonate` | re-run | |
+|:---|---:|---:|---:|:---|
+| `80057524_0001_114` | 56 | 136 | 68 | doubling removed |
+| `80222656_0004_90` | 69 | 144 | 66 | doubling removed |
+| `81002096_0001_53` | 73 | 154 | 60 | doubling removed |
+| `81250824_0005_44` | 83 | 170 | 51 | doubling removed |
+| `81396664_0001_66` | 78 | 166 | 55 | doubling removed |
+| `82342224_0005_48` | 81 | 150 | 74 | doubling removed |
+| `83268087_0001_6` | 62 | 144 | 56 | doubling removed |
+| `83988903_0006_57` | 91 | 154 | 74 | doubling removed |
+| `84248019_0005_9` | 54 | 150 | 59 | doubling removed |
+| `82552643_0001_37` | 78 | 117 | 78 | closer |
+| `83404654_0001_2` | 84 | 108 | 63 | closer |
+| `82924339_0006_8` | 90 | 91 | 90 | closer |
+
+**Nine doublings removed, none introduced.** MAE across those twelve falls from
+**65.4 to 11.6 /min**.
+
+**Read that with its caveat.** This cohort ships no patient metadata, so the
+category can only be inferred from the reference rate — which is circular for HR
+accuracy, because the band is chosen to contain the answer. It is not evidence
+that the analyser is accurate. What it *is* evidence for is the attribution:
+a wrong `-s`, not the waveform, produced nine of the eleven over-readings. The
+fixed-category sweep therefore remains the regression baseline, and the
+per-subject pass is reported separately.
+
+**What remains after that is two recordings**, both of which stay in the
+neonatal band and still read 2.05 × their reference: `80666640_0014_146`
+(118 → 242) and `81741333_0001_34` (122 → 250).
+
+**And the second peak does not look like a dicrotic wave.** Labelling alternate
+peaks systolic and dicrotic on the recordings that read high, and measuring
+against the schematic below:
+
+| property | a dicrotic wave | measured |
+|:---|:---|:---|
+| position within the cycle | 30–40 % | **50–53 %** (p10 35–46, p90 60–65) |
+| trough before it, as % of the systolic rise above the foot | 40–70 % up | **−7 %** — it falls to or below baseline |
+| absolute level against the systolic peak | clearly lower | **equal**; higher on 43 % of beats |
+| the two interleaved intervals | short–long | **differ by 4–8 %** — near-uniform |
+
+A dicrotic notch is by definition a shallow inflection on the diastolic decay;
+these troughs return fully to baseline at the midpoint of the cycle and reach
+the amplitude of the peak they follow. Two of them have almost no pulsatile
+signal at all — perfusion index **4.1 %** and **6.3 %** against a cohort median
+of 40 % — so the detector is marking beats on a trace that barely contains a
+pulse. The systolic/dicrotic labelling assumes the reference rate is correct;
+the perfusion index and the band arithmetic above do not.
 
 > **This will be addressed in an upcoming release.** It is not closed in this
 > one. What that costs a reader of the output is set out below, along with every

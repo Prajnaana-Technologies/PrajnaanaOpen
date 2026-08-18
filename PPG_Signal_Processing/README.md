@@ -167,15 +167,17 @@ The bands each type selects, and their citations, are in
 
 Stated plainly because they bound what the outputs mean:
 
-- **A pronounced dicrotic wave can double the reported heart rate.** Measured on
-  5 of the 68 short recordings, with at least 9 of 58 reading high. It is the
-  most serious limitation here and the most dangerous shape a rate error can
-  take: doubling a bradycardic patient lands *inside* the expected band, so no
-  warning fires and the result looks healthy. **Both source detectors' own
-  defences against it are implemented**; the measurements show they are not
-  sufficient at this operating point, which is outside the cohorts either author
-  validated. **This will be addressed in an upcoming release.** The mechanism,
-  every repair measured and rejected, and what a complete fix needs are in
+- **The reported heart rate can come out at twice the truth.** It is the most
+  serious limitation here and the most dangerous shape a rate error can take:
+  doubling a bradycardic patient lands *inside* the expected band, so no warning
+  fires and the result looks healthy. **The dominant cause is a declared-subject
+  mismatch, not a dicrotic wave** — with one category declared for all 68 short
+  recordings, 11 of the 58 with a reference read high; declaring the category
+  each recording's rate belongs to removes 9 of those and introduces none.
+  **Two remain**, both reading 2.05 × their reference inside the correct band,
+  and both source detectors' own defences against a dicrotic wave are already
+  implemented. **This will be addressed in an upcoming release.** The evidence,
+  including why the second peak does not have dicrotic morphology, is in
   [`docs/DESIGN.md`](docs/DESIGN.md), "Dicrotic doubling".
 - **HRV is indicative, not Task Force conformant** — the rolling window
   straddles the 300 s short-term standard rather than satisfying it.
