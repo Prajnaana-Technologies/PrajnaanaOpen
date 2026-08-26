@@ -107,9 +107,9 @@
  * literature instead.
  *
  * CEILING, 30/min: [LIU]'s normal-breathing range is 0.1-0.5 Hz = 6-30/min.
- * [CHARLTON]'s wider 4-60/min was measured across the annotated adult recordings
- * and is materially worse (MAE 6.09 vs 3.39, subharmonic locking 23 % vs 13 %):
- * harmonic ambiguity exists wherever 2f <= f_hi, so a 60/min ceiling puts the
+ * [CHARLTON]'s wider 4-60/min was tried across the annotated adult recordings
+ * and is materially worse, both in error and in how often the search locks onto
+ * a subharmonic: harmonic ambiguity exists wherever 2f <= f_hi, so a 60/min ceiling puts the
  * second harmonic of every normal adult rate inside the search.
  *
  * FLOOR, 4/min: a deliberate widening of [LIU]'s 6, adopted only after the low
@@ -211,9 +211,9 @@
  * so 2/min is not adopted.  The shipped floor is 4/min -- widened from [LIU]'s
  * 6 once whitening and the harmonic guard made the low bins usable; see
  * docs/DESIGN.md.  A 2/min floor is not usable here: it would need a 131 s
- * segment and a 524 s window (8.7 min latency), and it collapsed a recording whose rate sits at
- * exactly twice the newly admitted floor (MAE 0.12 -> 6.06) by admitting its
- * own half-rate into the search.
+ * segment and a 524 s window (8.7 min latency), and it collapses a recording
+ * whose rate sits at exactly twice the newly admitted floor, by admitting that
+ * recording's own half-rate into the search.
  *
  * MORE IMPORTANTLY, lowering it does not buy slow breathing -- it buys the drift
  * bin.  The peak search runs on Welch SEGMENT bins, and the segment is
@@ -296,12 +296,12 @@
  * 4 /min floor gives a 703-sample segment, which rounds up to 1024 and forces a
  * 4096-sample window -- 262 s of latency, four times what is shipped.
  *
- * It would also buy little.  Doubling the adult segment from 256 to 512 inside
- * the existing 1024 window moved MAE only 1.74 -> 1.65, because the gain is
- * confined to windows below 3 cycles: adults at 12-22 /min already sit at a
- * median of 5.1 cycles per segment, only 13 of 135 windows were in the starved
- * region, and those did improve (2.71 -> 2.41).  A further doubling would reach
- * fewer windows still, at four times the latency.
+ * It would also buy little.  Doubling the adult segment inside the existing
+ * window barely moved the error, because the gain is confined to windows below
+ * 3 cycles: adults at ordinary rates already sit well above that, only a small
+ * minority of windows were in the starved region, and those did improve.  A
+ * further doubling would reach fewer windows still, at four times the
+ * latency.
  *
  * CONSEQUENCE, stated rather than hidden: with a 512-sample segment the adult
  * band floor of 4 /min carries 2.18 cycles, short of the 3-cycle rule, so RR
@@ -312,11 +312,10 @@
  * NEONATES gain the most and were the reason for doing this.  128 samples still
  * gives 3.0 cycles at their 22 /min floor, so nothing is lost, and the window
  * halves to 32.8 s -- the right direction for the population that deteriorates
- * fastest.  Measured on the two neonatal recordings (raw 12-bit input, -nu 1),
- * 1024/256 -> 512/128: median RR 26.84 -> 28.35 and 28.77 -> 28.78, with the
- * interquartile spread TIGHTENING from 3.09 -> 2.33 and 4.79 -> 1.99 despite
- * the shorter window.  No neonatal breath annotations exist, so that is
- * stability and plausibility, NOT a demonstration of accuracy.
+ * fastest.  On the neonatal recordings the shorter window leaves the reported
+ * rate where it was and TIGHTENS its interquartile spread rather than widening
+ * it.  No neonatal breath annotations exist, so that is stability and
+ * plausibility, NOT a demonstration of accuracy.
  *
  * CHILD is unchanged at 256 / 1024 -- the derivation lands exactly on what was
  * already there (255.7 -> 256).  It is written out here so the value is
@@ -371,26 +370,14 @@
 /* ---------------------------------------------------------------------------
  * UNSOURCED -- deliberately NOT defined here
  *
- * An adult band of 8-30/min was once measured as far better than any sourced
- * option (MAE 1.79 vs 3.39, subharmonic 4 % vs 13 %, 81 % within 2/min vs 65 %).
+ * An adult band of 8-30/min once looked far better than any sourced option, on
+ * a configuration that no longer exists -- floor 6, a shorter segment,
+ * outward-rounded band edges and NO 1/f whitening.  THAT CONCLUSION NO LONGER
+ * HOLDS: re-run on the current build, a floor of 8 is materially worse overall.
  *
- * ** THOSE NUMBERS ARE OBSOLETE AND THE CONCLUSION NO LONGER HOLDS. **  They
- * were taken on an earlier configuration -- floor 6, a 256-sample segment,
- * outward-rounded band edges and NO 1/f whitening.  The baseline it beat (3.39)
- * does not exist any more.  Re-measured on the current build:
- *
- *      floor 4 (shipped)   MAE 0.86   within-2 92 %   subharmonic 2 %
- *      floor 8             MAE 1.43   within-2 88 %   subharmonic 0 %
- *
- * (Both rows are one A/B taken together; it is their DIFFERENCE that matters.
- * The absolute level is not the shipped headline -- for that see docs/RESULTS.md,
- * which scores settled rows only.)
- *
- * Floor 8 is now materially WORSE overall.  It does help the records the drift
- * floor used to spoil -- the drift-heavy recordings improve by 0.8-1.1 /min, and
- * MAE excluding the slow-breathing recording falls 0.68 -> 0.54 -- but it puts a 6/min
- * subject outside the search entirely, and the slow-breathing recording goes
- * 2.79 -> 11.23.
+ * It does help the recordings the drift floor used to spoil, but it puts a
+ * 6/min subject outside the search entirely, and the slow-breathing recording
+ * collapses.  The comparison is in docs/DESIGN.md.
  *
  * So the trade is no longer "fitted but better"; it is "fitted, and better only
  * if you are willing not to measure slow breathing at all".  It remains

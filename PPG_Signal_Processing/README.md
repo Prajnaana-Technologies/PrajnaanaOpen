@@ -157,6 +157,66 @@ The bands each type selects, and their citations, are in
 
 ---
 
+## Live monitor
+
+`Monitor/` holds a desktop application that turns this engine's output into a
+patient-monitor style display: the raw and detection waveforms side by side with
+the detector's onset and peak marks on them, and cards for heart rate,
+respiratory rate, respiratory variability, the three HRV measures, and what the
+engine did with the current window.
+
+It reads **no files**. It launches the engine itself and consumes the plot
+stream described under `-p on` in
+[`docs/USER_GUIDE.md`](docs/USER_GUIDE.md) — per-sample rows at the sampling
+rate, a per-beat row carrying the heart rate, and a per-window row with the
+respiratory and variability figures — so what is on screen is what the engine
+just emitted, not a file re-read after the fact. The heart rate has its own row
+because it is known from the second beat, and waiting for the window row would
+keep it off the display for another fifteen seconds.
+
+A respiratory rate is **held through a window the engine declines**, with its
+age shown beside it, and expires after one analysis window. That is deliberate:
+declines arrive in runs, and blanking a vital sign for a minute while every
+other card keeps updating tells a reader less than an ageing number does. It is
+not a delay — a window that reports is shown as soon as it arrives, unmarked.
+
+Nothing waits on the respiratory estimator that does not have to. **Heart rate
+is on screen from the first frame**, carried on its own per-beat row rather than
+on the window row that does not exist until a respiratory rate does. While that
+one is still filling, the status card says how much longer — *"Warming up 16 of
+66 s"* — and when a window is declined it says which surrogate stood apart. The
+HRV figures carry the interval count they rest on, and the top bar names the
+recording on screen.
+
+Two synthesized recordings ship with it, adult and neonatal, so it can be run
+without obtaining the third-party datasets. It needs Python with PySide6 and
+pyqtgraph; the engine itself needs neither, and nothing in `src/` depends on it.
+
+### Running it
+
+A recent Debian or Ubuntu marks its system Python as externally managed and
+will refuse to install into it, so the two packages go in a virtual
+environment. PySide6 is not in apt at all:
+
+```bash
+python3 -m venv ~/ppgmon
+~/ppgmon/bin/pip install PySide6 pyqtgraph
+
+# from this directory -- it finds and builds the engine itself
+~/ppgmon/bin/python Monitor/python_plot/ppg_plot.py -i Monitor/synthesized_sample_adult.txt -r 125 -s adult -c 0
+```
+
+`--outdir` puts the engine's CSVs somewhere other than the current directory,
+`--exe` names an engine to use instead of building one, and `--no-build` stops
+it invoking `make`. Nothing else is needed: the PySide6 wheel carries its own
+Qt, including the Wayland and X11 platform plugins, so it runs on a normal
+desktop session without further system packages.
+
+| document | |
+|:---|:---|
+| [`Monitor/User_Guide_PPG_SignalMonitoring.pdf`](Monitor/User_Guide_PPG_SignalMonitoring.pdf) | installing and running the monitor, and what each card shows |
+| [`Monitor/TechDoc_PPG_SignalMonitoring.pdf`](Monitor/TechDoc_PPG_SignalMonitoring.pdf) | how it is built and how it joins the two row shapes on the stream |
+
 ## Known limitations
 
 Stated plainly because they bound what the outputs mean:
@@ -170,16 +230,19 @@ Stated plainly because they bound what the outputs mean:
   each recording's rate belongs to removes 9 of those and introduces none.
   **Two remain**, both reading 2.05 × their reference inside the correct band,
   and both source detectors' own defences against a dicrotic wave are already
-  implemented. **This will be addressed in an upcoming release.** The evidence,
-  including why the second peak does not have dicrotic morphology, is in
-  [`docs/DESIGN.md`](docs/DESIGN.md), "Dicrotic doubling".
+  implemented. The evidence, including why the second peak does not have
+  dicrotic morphology, is in [`docs/DESIGN.md`](docs/DESIGN.md),
+  "Dicrotic doubling".
 - **HRV is indicative, not Task Force conformant** — the rolling window
   straddles the 300 s short-term standard rather than satisfying it.
 - **RRV is derived and indicative**, with no validated reference.
 - **Neonatal RR coverage is roughly half the windows** — the quality gate
-  correctly declines those where the surrogates disagree.
-- **Very slow breathing is hard** — at 6 /min, four harmonics fall inside the
-  adult search band.
+  correctly declines those where the surrogates disagree. Variability is
+  reportable on far more of them, because a window can supply a rhythm without
+  supplying a rate it stands behind.
+- **Very slow breathing is not handled** — at 6 /min four harmonics fall inside
+  the adult search band, the surrogates lock onto different ones, and the
+  cohort's single 6 /min recording now reports a rate on 9 % of its windows.
 
 Each is quantified in [`docs/USER_GUIDE.md`](docs/USER_GUIDE.md); the numbers
 behind them are in [`docs/RESULTS.md`](docs/RESULTS.md) and the reasoning in
@@ -191,21 +254,25 @@ behind them are in [`docs/RESULTS.md`](docs/RESULTS.md) and the reasoning in
 
 | file | |
 |:---|:---|
+| [`CHANGELOG.md`](CHANGELOG.md) | what changed in each release, and what it measured |
 | [`docs/RESULTS.md`](docs/RESULTS.md) | **every measured figure, in one place** — the authoritative source when the algorithm is tuned |
 | [`docs/ppg_arch.md`](docs/ppg_arch.md) | module map and how a sample flows through the pipeline |
 | [`docs/DESIGN.md`](docs/DESIGN.md) | the engineering record — every design decision and the measurement that justifies it |
 | [`docs/FIDUCIAL_INTERFACE.md`](docs/FIDUCIAL_INTERFACE.md) | the beat-detector contract — the detector is the one pluggable stage, so it is the one with a normative interface |
 | [`docs/USER_GUIDE.md`](docs/USER_GUIDE.md) | how to build and run it, every option, and how to read the output |
 | [`CREDITS.md`](CREDITS.md) | every research paper and dataset used, with DOI links, and the people who contributed |
+| [`Monitor/User_Guide_PPG_SignalMonitoring.pdf`](Monitor/User_Guide_PPG_SignalMonitoring.pdf) | the live monitor: installing it, running it, and reading its display |
+| [`Monitor/TechDoc_PPG_SignalMonitoring.pdf`](Monitor/TechDoc_PPG_SignalMonitoring.pdf) | the live monitor: how it is built and how it consumes the plot stream |
 
 ## Layout
 
 ```
-PPG_Signal_Analysis/
+PPG_Signal_Processing/
 ├── src/         seven translation units — see docs/ppg_arch.md
 ├── include/     ppg_common.h · ppg_fiducial.h · filter_bands.h
 ├── docs/        user guide, results, architecture, engineering record, contract
 │   └── img/     generated figures (plain SVG, no drawing tool required)
+├── Monitor/     the live display, its two documents, and two sample recordings
 ├── Makefile     `make` builds it — other targets are situational
 ├── LICENSE      Apache-2.0
 └── NOTICE       attribution and the not-a-medical-device statement

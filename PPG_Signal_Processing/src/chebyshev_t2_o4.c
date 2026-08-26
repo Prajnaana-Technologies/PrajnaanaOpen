@@ -162,17 +162,17 @@ static uint32_t bp_primed   = 0u;
  * crest reports the wrong amplitude, and that error goes straight into the
  * surrogate the RR estimate reads.
  *
- * Length: sweeping the duration on all 12 annotated recordings put the optimum
- * at 5 taps at 125 Hz, degrading on either side (RR MAE 2.47 off, 2.43 at 24 ms,
- * 2.37 at 40 ms, 2.67 at 64 ms, 2.56 at 96 ms).  It is expressed in MILLISECONDS, not
+ * Length: sweeping the duration over the annotated recordings put the optimum
+ * at 5 taps at the design rate, with respiratory accuracy degrading on either
+ * side of it.  It is expressed in MILLISECONDS, not
  * taps, so that it obeys the sampling-rate rule (docs/FIDUCIAL_INTERFACE.md SS3.7):
  * 40 ms is exactly 5 taps at the 125 Hz design point and stays a 40 ms window
  * at any other rate, where a constant 5 taps would not.
  *
  * At 125 Hz the first null is at 25 Hz and the -3 dB point near 11 Hz, both far
  * above the 6 Hz the Chebyshev already passes, so the pulse waveform itself is
- * essentially untouched -- confirmed by beat detection being unchanged
- * (median F1 99.0 with and without).
+ * essentially untouched -- confirmed by beat detection scoring the same with
+ * the smoothing in place and removed.
  *
  * Applied here rather than in each detector so that every detector sees the same
  * conditioned stream, and so the choice of detector cannot quietly change the
@@ -313,6 +313,32 @@ static void report_stability (void)
     return;
 }
 
+/* Corners and smoothing span for the recording being started.  Defaults are the
+ * built-in values, so a caller that does not set them gets exactly what the
+ * shared header used to pin; filter_configure() is how the subject reaches
+ * them.  See struct_subject_band. */
+static double s_hp_corner_hz = BP_HP_CORNER_HZ;
+static double s_lp_corner_hz = BP_LP_CORNER_HZ;
+static double s_smooth_ms    = PPG_SMOOTH_MS;
+
+/**
+ * @brief Adopt the subject's band-pass corners and smoothing span.
+ *
+ * Called before the filter is designed.  A value that is not usable is left at
+ * its default, so a caller that sets nothing gets the built-in design.
+ *
+ * @param hp_hz     Band-pass lower corner, Hz
+ * @param lp_hz     Band-pass upper corner, Hz; must exceed hp_hz
+ * @param smooth_ms Post-filter moving average span, ms
+ */
+void filter_configure (double hp_hz, double lp_hz, double smooth_ms)
+{
+    if (hp_hz > 0.0)     { s_hp_corner_hz = hp_hz; }
+    if (lp_hz > hp_hz)   { s_lp_corner_hz = lp_hz; }
+    if (smooth_ms > 0.0) { s_smooth_ms    = smooth_ms; }
+    return;
+}
+
 /**
  * @brief Design the sample-path Chebyshev Type II band-pass.
  *
@@ -334,8 +360,8 @@ int32_t init_chebyshev_filter (int32_t fs_hz)
     cplx     pp [CHEB2_ORDER], pz [CHEB2_ORDER];
     double   fs   = (double)fs_hz;
     double   nyq  = fs / 2.0;
-    double   f_lo = BP_HP_CORNER_HZ;
-    double   f_hi = BP_LP_CORNER_HZ;
+    double   f_lo = s_hp_corner_hz;
+    double   f_hi = s_lp_corner_hz;
     double   w1, w2, w0sq, bw, sc, gain, wc;
     int      half = CHEB2_ORDER / 2;
     int      k, sec;
@@ -424,9 +450,9 @@ int32_t init_chebyshev_filter (int32_t fs_hz)
      * separate lower clamp is needed.  movavg_init() applies the upper clamp:
      * MOVAVG_MAX_TAPS bounds the ring, and a high -r can reach it. */
     movavg_init (&s_sample_ma,
-                 ((uint32_t)(((PPG_SMOOTH_MS * fs) / 1000.0) + 0.5)) | 1u);
+                 ((uint32_t)(((s_smooth_ms * fs) / 1000.0) + 0.5)) | 1u);
     printf("Post-filter smoothing: %u ms = %u taps at %.1f Hz\n",
-           (unsigned)PPG_SMOOTH_MS, s_sample_ma.taps, fs);
+           (unsigned)s_smooth_ms, s_sample_ma.taps, fs);
     putchar ('\n');
     return (0);
 }
@@ -529,13 +555,17 @@ void    movavg_init (struct_movavg *ps_ma, uint32_t taps)
 /**
  * @brief Push one sample through a moving average and return the smoothed value.
  *
- * Trailing (causal) average of the last `taps` samples, kept as a running sum so
- * the cost is one add and one subtract per sample whatever the window length.
+ * MID-POINT average of `taps` samples, kept as a running sum so the cost is one
+ * add and one subtract per sample whatever the window length.
+ *
+ * The sum is over the newest `taps` samples because that is all a stream has;
+ * the value it yields is the average about the sample movavg_group_delay()
+ * behind the newest, and the caller stores it at that index.  See the block
+ * comment beside struct_movavg in ppg_common.h.
  *
  * Before the window has filled, only the samples that have actually arrived are
  * averaged -- otherwise the zero-filled tail would drag the first outputs toward
- * zero.  A caller that waits for a full window before using the output never
- * reaches that branch, and gets the plain N-tap average from its first result.
+ * zero.
  *
  * @param ps_ma        The instance
  * @param sample_value One input sample
@@ -564,16 +594,16 @@ int32_t movavg_run (struct_movavg *ps_ma, int32_t sample_value)
 }
 
 /**
- * @brief Group delay of a moving-average instance, in samples of its own stream.
+ * @brief Half-width of a moving-average instance, in samples of its own stream.
  *
- * A trailing N-tap average delays its output by (N-1)/2 samples, so anything
- * located on the smoothed stream is that much late.  A causal filter cannot
- * centre its own output -- the value for sample n would need samples up to
- * n + (N-1)/2 -- so the delay is published here and each consumer puts its own
- * results back on the true time base.  See the block comment in ppg_common.h.
+ * An N-tap average describes the middle of its own window, so the value handed
+ * back for the newest sample belongs to the one (N-1)/2 behind it.  That offset
+ * is published here so every consumer stores the value at the sample it
+ * describes, which is what keeps the smoothed stream on the true time base.
+ * See the block comment in ppg_common.h.
  *
  * @param ps_ma The instance
- * @return      Delay in samples; 0 when the window is a single tap.
+ * @return      Half-width in samples; 0 when the window is a single tap.
  */
 uint32_t movavg_group_delay (const struct_movavg *ps_ma)
 {
@@ -582,15 +612,21 @@ uint32_t movavg_group_delay (const struct_movavg *ps_ma)
 }
 
 /**
- * @brief Group delay of the sample-path smoothing stage, in input samples.
+ * @brief Half-width of the smoothing window, in input samples.
  *
- * 2 samples -- 16 ms -- at the 125 Hz design point.  Applied equally to every
- * fiducial, so beat INTERVALS, and therefore HR and HRV, are unaffected by it;
- * what it moves is each fiducial's absolute timestamp, which matters to anything
- * correlating this signal with another.  The detectors subtract it from the
- * indices they report.
+ * 2 samples -- 16 ms -- at the 125 Hz design point.
  *
- * @return Delay in samples; 0 when smoothing is disabled.
+ * A moving average of N taps describes the MIDDLE of its own window, so the
+ * value movavg_run() hands back for the newest sample is the average about the
+ * sample this far behind it.  That is the whole of it: a caller stores the
+ * result at index (n - this) and its smoothed stream is on the true time base,
+ * with nothing to correct afterwards.  It is the same one average, used the
+ * same way, as on the surrogate grid in ppg_analysis.c.
+ *
+ * Storing it at n instead is what makes an average look causal, and leaves
+ * every fiducial found on that stream late by this much.
+ *
+ * @return Half-width in samples; 0 when smoothing is disabled.
  */
 uint32_t smooth_group_delay (void)
 {

@@ -14,13 +14,16 @@
  * Both detectors are compiled in and linked, and one is chosen when a recording
  * starts.
  *
- * WHY IT IS A RUNTIME CHOICE.  Which detector is better DEPENDS ON THE PATIENT, and the
- * patient is already a runtime knob.  Measured against an independent reference
- * on the neonatal pair, Karlen IMS reaches sensitivity 94-96 % where Elgendi
- * TERMA reaches 88-89, and the beats TERMA misses arrive as doubled intervals:
- * its raw heart rate reads 9-11 % LOW and its SDNN and RMSSD roughly DOUBLE.
- * On adults the ranking reverses -- TERMA F1 98.7 against 96.6 -- because IMS
- * over-detects there.  A single compile-time choice cannot serve both, and
+ * WHY IT IS A RUNTIME CHOICE.  Which detector is better DEPENDS ON THE
+ * PATIENT, and the patient is already a runtime knob.  Scored against an
+ * independent reference at neonatal rates, Karlen IMS finds more of the beats
+ * than Elgendi TERMA, and the beats TERMA misses arrive as doubled intervals.
+ * The interval sanitiser splits those, so the reported heart rate survives
+ * them and reads correctly either way; the beat count, the raw interval spread
+ * behind SDNN and RMSSD, and the respiratory coverage do not.  On adults the
+ * ranking reverses, because IMS over-detects there -- it matches TERMA for
+ * beats found and loses on the ones it adds.  The figures are in
+ * docs/RESULTS.md.  A single compile-time choice cannot serve both, and
  * shipping two binaries is exactly what the patient-type knob exists to avoid.
  *
  * Each detector therefore exposes PREFIXED entry points and the dispatcher in
@@ -118,8 +121,24 @@ typedef enum
 typedef struct  tag_fiducial
 {
     uint32_t        sel_fs_hz;
-    void           *user;               /* opaque analysis context            */
-    uint32_t        ring_wr_pos;           /* samples written to s_data_buf      */
+    void           *user;           /* opaque analysis context            */
+    uint32_t        ring_wr_pos;    /* samples written to s_data_buf      */
+
+    /* Marks placed so far, counted where they are placed.  A caller that
+     * displays the marked stream needs to know when the detector has actually
+     * found something: both non-zero means a whole beat has been recognised,
+     * and until then there is nothing to show.  Counted here rather than
+     * discovered by searching s_data_buf, because a mark is written to a sample
+     * that has already gone past -- a search would have to look backwards, and
+     * would have to know how far back to look.
+     *
+     * They count marks PLACED, which is not always the same as marked samples:
+     * two consecutive beats can resolve their onset to one sample, and that
+     * sample is then marked twice.  Comparing these against the marks in a
+     * trace is still the right integrity check -- it just answers "two beats
+     * shared an onset" as well as "a mark was missed". */
+    uint32_t        peak_count;
+    uint32_t        foot_count;
     struct_data_buf s_data_buf [PPG_RING_LEN];
 
 } struct_fiducial;
@@ -187,6 +206,7 @@ void    ims_fiducial_process_sample (struct_fiducial *ps_fd, int32_t sample_valu
  * @brief Feed one raw sample.  Callbacks fire as beats are recognised.
  */
 void    fiducial_process_sample (struct_fiducial *ps_fd, int32_t sample_value);
+
 
 /**
  * @brief Is @p period_ms the signal's fundamental, or half of it?

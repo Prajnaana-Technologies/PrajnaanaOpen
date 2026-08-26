@@ -46,6 +46,13 @@ Three conventions apply to every figure quoted anywhere in this project:
 - **Median, not mean, across recordings** — with the worst case quoted beside
   it, because one bad recording matters more than an average conceals.
 - **Signal time, not run time** — as stated above.
+- **A/B tables record the comparison, not the current build.** This document is
+  the engineering record, so each experiment is quoted with the figures it was
+  measured against at the time. The two columns of such a table are directly
+  comparable with one another and are not a claim about today's output; a column
+  headed *shipped* means "the build this was measured against". For the current
+  figures there is one authority, [`RESULTS.md`](RESULTS.md), and it is
+  regenerated from the validation run rather than transcribed.
 
 ## Datasets and attribution
 
@@ -130,7 +137,7 @@ source is unaffected.
 | **prominence (`q`)** | peak power divided by the median in-band power — how far a peak stands above its surroundings |
 | **parabolic refinement** | fitting a quadratic through the peak bin and its neighbours to locate the peak between bins |
 | **harmonic / sub-harmonic** | integer multiples (2f, 3f…) and fractions (f/2) of the true rate. A non-sinusoidal breath puts real energy at its harmonics, so a spectral peak can land on the wrong one |
-| **group delay** | the time lag a causal filter imposes. Constant delay cancels out of *intervals*, so it never affects a rate — but it does shift absolute fiducial timestamps |
+| **group delay** | the time lag a causal filter imposes. Constant delay cancels out of *intervals*, so it never affects a rate — but it does shift absolute fiducial timestamps. The sample-path Chebyshev imposes one and it is not corrected; the moving averages impose none, because each is stored at the middle of its own window |
 | **zero-phase** | forward-then-reverse filtering, which cancels phase distortion. Needs the whole record, so it is only usable on the buffered respiratory path |
 
 ### Code-specific names
@@ -1310,9 +1317,13 @@ It is nonetheless an unsourced value — no paper specifies a smoothing stage at
 this point — and `filter_bands.h` labels it as such under its `UNSOURCED`
 discipline rather than dressing it up with a citation it does not have.
 
-Group delay is `(taps − 1) / 2` = 2 samples (16 ms at 125 Hz), applied equally
-to every fiducial, so beat *intervals* — and therefore HR and HRV — are
-unaffected.
+An average of N taps describes the **middle** of its own window, so the value it
+yields for the newest sample belongs to the one `(taps − 1) / 2` = 2 samples
+(16 ms at 125 Hz) behind it, and it is stored there. The smoothed stream is
+therefore on the true time base and a fiducial found on it needs no correction
+afterwards — the same rule the surrogate grid has always used. Storing it at the
+newest sample instead is what would make the average trailing and leave every
+fiducial 2 samples late.
 
 ### Both changes re-measured on IMS
 
@@ -1403,6 +1414,181 @@ coupling even stays positive.
 Keeping the systolic peak alone is therefore the right choice for this pipeline,
 and the earlier claim that "AM and BW share a baseline component" — while true
 (r = +0.41) — does not imply Liu's remedy is the answer to it.
+
+## The block boundary belongs to the W1 average
+
+Elgendi's detector opens a block of interest when MA_peak, the W1 average, rises
+above the threshold MA_beat carries, and closes it when it falls back. The peak
+is then the maximum of the signal inside that block.
+
+Both averages here are running sums ending at the newest sample, so each
+describes the middle of its own window: MA_peak half a W1 back, MA_beat half a
+W2 back. The block boundary is an event in MA_peak, so it belongs at the W1
+centre. Recording it at the W2 centre places it (W2 - W1) / 2 too early -- 34
+samples for an adult at 125 Hz, about a third of a beat -- and the search then
+runs over signal the pulse has not reached. It returns the edge of its own
+window rather than a peak.
+
+| | offset to the crest | pinned to a window edge |
+|:---|---:|---:|
+| boundary at the W2 centre | 45 samples early | **696 of 700** |
+| boundary at the W1 centre | **0** | **0 of 700** |
+
+MA_beat is left where its own window puts it. It is the one-beat baseline the
+threshold rides on, it moves slowly, and reading it from slightly earlier costs
+nothing measurable; re-centring it on the W1 axis means waiting half a W2 for
+samples the decision does not need, and was measured to place every fiducial
+identically at 2.7 times the reporting delay.
+
+Beat F1 rises 98.7 to 99.0 and the worst recording 92.0 to 94.1, improved on
+eight recordings and unchanged on four. Reporting delay falls from 64 samples to
+22.
+
+## The pulse onset is a property of its own rising edge
+
+The onset is where a pulse started rising. Recovering it as the lowest sample
+between the previous peak and this one ties it to a window whose far edge is
+another fiducial, so it moves whenever that fiducial does: correcting the peak
+above, by itself, relocated **343 of 712 onsets** on a waveform where no onset
+had moved at all.
+
+It is now found from this pulse alone. Climb from the declared peak to the
+crest -- the declared peak is the strongest point of the detection copy, which
+carries that stage's own delay and can sit a sample or two past the crest --
+then take the lowest sample in the beat ending there. One beat still bounds the
+search, because nothing physiological rises for that long and the bound is what
+keeps the reach back finite.
+
+A walk back down the rise was measured first and rejected: a rise is not
+perfectly monotonic and the walk halts at the first wobble, leaving a quarter of
+the onsets up to 14 samples short of the trough. A single minimum over the beat
+does not have that failure. Onset placement is unchanged by the switch, and it no
+longer depends on the peak.
+
+## A line has a maximum length
+
+A Karlen line is a monotonic stretch built by merging fixed-length segments
+while the slope sign agrees. On a flat or slowly drifting stretch the sign keeps
+agreeing and the line never closes. Because a line's start is an onset the
+detector may still report, the oldest sample it can name then recedes without
+limit: six of 66 MIMIC recordings drove it past 1000 samples, further back than
+the sample ring holds, at which point a trace row would read a slot a later
+sample had already overwritten.
+
+Lines now close by force after two of the subject's slowest beats -- which is
+why this detector needs the heart-rate band it previously discarded. One beat
+was measured first and is too tight: it broke three lines the detector had
+legitimately merged, adding a beat to one neonatal recording and two to the
+other. Two beats leaves both counts exactly as they were and brings the worst
+reach from 1152 samples to 336.
+
+## When is a sample finished
+
+The trace carries a mark at each detected onset and peak. A detector names those
+retrospectively, so a row written the instant its sample arrived would claim "no
+peak here" about a sample the detector is about to mark.
+
+The question the trace has to answer is not "has the detector started working",
+which it does within a beat or two, but "can this index still change". Each
+detector answers it directly, reporting the oldest index it may still write to,
+and the trace writes every row below that. Measured across 80 recordings:
+
+| | min | max | average | median |
+|:---|---:|---:|---:|---:|
+| adult, Elgendi TERMA | 93 | 187 | 96.7 | 93 |
+| neonate, Karlen IMS | 5 | 166 | 28.9 | 28 |
+| MIMIC cohort, Karlen IMS | 5 | 336 | 27.4 | 22 |
+
+A fixed count cannot express that. Sized from the typical adult case it loses
+roughly half the onsets, and at a higher sampling rate it loses all of them --
+128 samples yields no marks whatever at 500 Hz, because the reach scales with
+the rate. The sample ring is the ceiling: a row further back than it holds
+cannot be read at all, which is what bounds the usable sampling rate.
+
+Samples still inside the reach when the input ends have no decided marks and are
+not written, so the trace is shorter than the recording by that much.
+
+## A single witness reports variability but not a rate
+
+Two surrogates must concur before a rate is published. A window where only one
+does is the worst this stage produces and no rate is reported for it.
+
+The period that window would have reported is nevertheless kept, and used to
+narrow that window's own breath intervals. The variability figures need a rhythm
+to gate against and nothing else can supply one; withholding it as well cost
+reportable variability on the neonatal recordings, where more than half the
+windows have a single witness -- 87 % and 84 % reportable with the period kept
+against 49 % each without it. A spread is a weaker claim than a rate and
+survives a rate this rough.
+
+Publishing the rate itself alongside it does not. Measured, that doubled the
+limits of agreement from 1.9 to 4.7 /min and multiplied sub-harmonic locking
+eightfold, so the rate stays withheld.
+
+## What two surrogates agreeing is worth
+
+The agreement threshold is the only fitted value in the fusion; every other
+constant there carries a citation. It was fitted on bidmc_01..08 and reported on
+bidmc_09..12, which were not examined until the value had been chosen.
+
+It is far tighter than it was, because the surrogates changed character. While
+the systolic peak sat off the crest and the onset was derived from it, the
+amplitude and baseline tracks were near-copies of each other -- agreeing to
+within 0.27 /min on eleven of twelve recordings, and to within 0.00 on one -- so
+a loose threshold cost nothing because they agreed regardless. That is not
+corroboration. Corrected, they disagree honestly, and a loose threshold then
+admits a pair that is merely close as though it concurred.
+
+The fitting set is flat from 1.0 to 2.0 /min and falls off a cliff at 2.25,
+where the limits of agreement double. The shipped value sits inside the plateau
+rather than at its edge.
+
+| held-out bidmc_09..12 | settled MAE | within-2 | limits of agreement |
+|:---|---:|---:|---:|
+| before | 0.557 | 97.4 % | 2.14 |
+| after | **0.476** | **99.5 %** | **1.44** |
+
+## Values that belong to the subject, not to the build
+
+`-s` already resolved the respiratory band, the heart-rate band, the analysis
+window, the Welch segment, the report cadence and the default detector. Seven
+more values now travel with them, each moved out of a shared header:
+
+| carried per subject | had been |
+|:---|:---|
+| spectral accumulation depth | `RR_PSD_ACCUM_N` |
+| surrogate agreement tolerance | `RR_AGREEMENT_THRESHOLD` |
+| smallest window that may report | `RR_PROG_MIN_PTS` |
+| peak prominence floor | `RR_MIN_PEAK_PROMINENCE` |
+| band-pass corners | `BP_HP_CORNER_HZ`, `BP_LP_CORNER_HZ` |
+| post-filter smoothing span | `PPG_SMOOTH_MS` |
+
+The test for belonging here is whether the value is meaningful only against a
+quantity that differs between categories, and each of these fails to be
+build-wide on that test.
+
+The accumulation depth counts windows, but what it is counting is how far the
+rate may drift before it leaves a frequency bin -- and a bin is 1.83 /min for an
+adult against 7.32 for a neonate. The agreement tolerance and the prominence
+floor are read against those same bins. The band-pass lower corner is at 0.02 Hz
+*because* the adult respiratory floor of 4 /min is 0.067 Hz and the BW surrogate
+needs everything above it preserved; a neonate's floor of 22 /min is 0.37 Hz,
+more than five times higher, so the same corner is doing a different job there.
+The smoothing span is a fraction of a pulse, and a neonatal pulse is half the
+length of an adult's.
+
+This is the same error the beat detector was corrected for once already -- carry
+the definition, not the number -- applied to the analysis layer.
+
+**Every category holds the value its build already used.** The change names
+these quantities and routes them through the one place that resolves the
+subject; it does not alter any of them. Verified across the whole corpus: 12
+adult recordings, 2 neonatal and 68 MIMIC, every output file byte-identical.
+What it buys is the ability to answer them per subject, which several of them
+demonstrably need and none of them could express before.
+
+The filter corners reach the design through `filter_configure()` rather than
+through the detector contract, which is counted and must not grow.
 
 ## Known limits — not solvable in software alone
 
@@ -1596,8 +1782,8 @@ afterwards and moved them again. Current figures are in
 first valid report stopped being a flat 65.5 s — a full window — and became a
 median of well under half that.
 
-The range is 18.1–82.8 s, and the late end is honest rather than a failing: the
-82.8 s recording is the 6 /min breather, and 16–33 s of data cannot contain a
+The range is 17.6–139.7 s, and the late end is honest rather than a failing: the
+latest recording is the 6 /min breather, and 16–33 s of data cannot contain a
 6 /min rate at any FFT length. The subject who most needs a fast answer is the
 one the physics makes wait.
 
@@ -1716,7 +1902,7 @@ edge-pinned the original choice stands, because then there is nothing better.
 decimal places. Coverage moves 91 % → 90 % (one row), because five rows shift
 from settled to provisional when the recording starts reporting earlier.
 
-### Why the slow breather still waits 82.8 s
+### Why the slow breather waits longest, and now mostly says nothing
 
 bidmc_05 remains OPEN. Its three surrogates lock onto DIFFERENT harmonics of the
 true 6 /min — 2.8f, 4.0f, 4.5f — so they never corroborate each other, while the
@@ -1994,7 +2180,7 @@ value stands, re-expressed per subject and nothing more.
 
 **Karlen IMS corroborates the mechanism.** It has no constant one-beat window — it
 merges segments incrementally, so the beat sets its own scale — and it finds
-**2880 and 2758** beats against the same expectation, i.e. 96 % both times, with
+**2877 and 2758** beats against the same expectation, i.e. 96 % both times, with
 no rate-dependent parameter at all. On adults the ranking reverses — see [`RESULTS.md`](RESULTS.md) — which is what
 a constant beat window predicts: the deficit is specific to the high-rate case.
 
@@ -2240,7 +2426,10 @@ beat:
 declaration, not about the beat — and the declaration is exactly what is wrong
 when it is wrong. Excluding vertices on it costs the annotated adults settled RR
 MAE **0.42 → 0.48** and within-2 99 % → 98 %. Excluding them on the local test
-costs those figures **nothing** — 0.42, 99 %, the same 570 settled rows.
+costs those figures **nothing** — 0.42 and 99 %.
+
+The four rows below were measured together and are directly comparable with one
+another — see "Reading the numbers" on how to read an A/B table here.
 
 | gate | adult RR MAE | within-2 | settled rows | neonatal RR windows | 2nd recording's IQR |
 |:---|---:|---:|---:|---:|---:|
@@ -2333,9 +2522,8 @@ of 40 % — so the detector is marking beats on a trace that barely contains a
 pulse. The systolic/dicrotic labelling assumes the reference rate is correct;
 the perfusion index and the band arithmetic above do not.
 
-> **This will be addressed in an upcoming release.** It is not closed in this
-> one. What that costs a reader of the output, and what a fix has to do, are set
-> out below.
+> **This is not closed.** What that costs a reader of the output, and what a fix
+> has to do, are set out below.
 
 **What IS done about it, and it is what the source algorithms prescribe.** Both
 detectors carry their authors' own defence against counting a dicrotic wave as a

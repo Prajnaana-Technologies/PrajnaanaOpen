@@ -3,6 +3,14 @@ ppg_analysis
 ppg_analysis_asan
 ppg_analysis_debug
 *.o
+# The same binaries as a Windows build names them.  A Windows `make` leaves an
+# executable next to every target here, and an untracked binary in the tree is
+# easy to commit by accident -- so they are ignored as a class.  The released
+# engine is the ONE exception, committed deliberately so the monitor can be run
+# on Windows without a compiler; the negation must follow the pattern it
+# overrides, or it has no effect.
+*.exe
+!ppg_analysis.exe
 
 # Run outputs -- the program writes these into the CURRENT WORKING DIRECTORY.
 # Run it from a scratch directory such as run/, not from here.

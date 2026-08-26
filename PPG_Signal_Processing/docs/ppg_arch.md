@@ -19,7 +19,7 @@ Each dashed enclosure is a processing stage. Solid boxes are translation units.
 ```mermaid
 flowchart TD
 
-    KNOB(["<b>-s neonate / child / adult</b><br/>one row of the subject table<br/>RR band · HR band · window · segment<br/>· default detector"])
+    KNOB(["<b>-s neonate / child / adult</b><br/>one row of the subject table<br/>RR band · HR band · window · segment<br/>· default detector · band-pass corners<br/>· smoothing span · accumulation depth<br/>· agreement and prominence"])
 
     subgraph READ["① DATA READ — per sample"]
         direction TB
@@ -28,7 +28,7 @@ flowchart TD
 
     subgraph FILT["② SAMPLE FILTER — per sample"]
         direction TB
-        CHEB["<b>chebyshev_t2_o4.c</b><br/>filter_int_sample() — Chebyshev II<br/>0.02–6 Hz, 4th-order prototype<br/>smooth_int_sample() — 40 ms MA"]
+        CHEB["<b>chebyshev_t2_o4.c</b><br/>filter_configure() — corners from the subject<br/>filter_int_sample() — Chebyshev II<br/>4th-order prototype<br/>smooth_int_sample() — moving average"]
     end
 
     subgraph FID["③ BEAT DETECTION — per sample, emits per beat<br/><i>does NOT model the dicrotic wave — see DESIGN.md</i>"]
@@ -302,17 +302,43 @@ with the geometry computed, so every grid sample lies exactly on its segment.*
 | file | stage | responsibility |
 |:---|:---:|:---|
 | `src/ppg_main.c` | ① ⑥ | command line, the subject-type table, block read, CSV headers |
-| `src/chebyshev_t2_o4.c` | ② | band-pass and smoothing of the raw sample stream |
+| `src/chebyshev_t2_o4.c` | ② | band-pass and smoothing of the raw sample stream; takes its corners and smoothing span from the subject |
 | `src/ppg_fiducial.c` | ③ | detector dispatch; the Goertzel fundamental check |
 | `src/ppg_fiducial_elgendi_terma.c` | ③ | TERMA detector (default for child/adult) |
 | `src/ppg_fiducial_karlen_ims.c` | ③ | IMS detector (default for neonate) |
 | `src/ppg_analysis.c` | ④ ⑤ | interval sanitising and repair classification, the ectopic gate, HR, the three surrogates, fusion, HRV |
 | `src/ppg_RR.c` | ⑤ | Welch PSD, peak estimation, breath intervals, RRV |
-| `include/ppg_common.h` | — | the analysis context and every tunable, each cited |
+| `include/ppg_common.h` | — | the analysis context, the subject row, and every tunable, each cited |
 | `include/filter_bands.h` | — | per-subject bands and the plausibility envelope, each cited |
 | `include/ppg_fiducial.h` | — | the detector contract |
 
 ---
+
+## The plot stream, and what reads it
+
+Everything above describes the two CSVs. `-p on` adds a third destination, and
+it is a *stream* rather than a file: the same numbers, written as they are
+produced, so something can display them while the recording is still running.
+
+Three row shapes share it, told apart by their first character, because the
+three things it carries become available at completely different rates:
+
+| row | when | why it is separate |
+|:---|:---|:---|
+| `<digit>` | every sample | the waveform and the detector's marks |
+| `H` | every beat | a heart rate is known from the second beat; making it wait for the window row kept it off a display for fifteen seconds |
+| `R` | every analysis window | the respiratory rate, the variability figures, and what the engine did with the window |
+
+The `R` row carries the three surrogate estimates, their prominences and the two
+thresholds they are judged by, so a reader can **reproduce** the engine's verdict
+rather than take it on trust — which is what lets a display say *which*
+surrogate disagreed instead of only that one did.
+
+Nothing in `src/` depends on a reader existing. `fp_data` is NULL unless `-p on`
+is given, the CSVs are byte-identical either way, and the live monitor in
+[`Monitor/`](../Monitor) is one consumer of a documented format, not a component
+of the pipeline. Its full description is in
+[`USER_GUIDE.md`](USER_GUIDE.md), under `-p on`.
 
 ## Two boundaries that matter
 
@@ -331,7 +357,18 @@ which one is better depends on the patient. One call goes the other way:
 through `fiducial_period_is_fundamental()`. See `FIDUCIAL_INTERFACE.md`.
 
 **The subject type is resolved once.** `ppg_main.c` picks a row from its subject
-table and hands it to `ppg_analysis_init()` and `fiducial_init()` as data. Below
-that line no stage branches on the category — each receives numbers and works
-from them. Reading the category from a device setting instead of `-s` is a change
-to that one block.
+table and hands it to `filter_configure()`, `ppg_analysis_init()` and
+`fiducial_init()` as data. Below that line no stage branches on the category —
+each receives numbers and works from them. Reading the category from a device
+setting instead of `-s` is a change to that one block.
+
+**What the row carries has grown, and deliberately.** A value belongs there when
+it is meaningful only against something that differs between subjects. The
+accumulation depth counts windows, but what it counts is how far a rate may
+drift before it leaves a frequency bin, and a bin is 1.83 /min for an adult
+against 7.32 for a neonate. The agreement tolerance and the prominence floor are
+read against those same bins. The band-pass lower corner exists because the
+adult respiratory floor of 4 /min is 0.067 Hz — a neonate's 22 /min is 0.37 Hz,
+five times higher. The smoothing span is a fraction of a pulse, and pulses
+differ two to one across these categories. Each of those was a constant in a
+shared header; none of them describes the build.

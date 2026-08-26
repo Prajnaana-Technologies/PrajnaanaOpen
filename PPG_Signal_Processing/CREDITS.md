@@ -19,6 +19,9 @@ algorithms.
 
 **Mamatha BV** — original author; design and implementation.
 
+**Dhanya Shree S** — the live monitor in [`Monitor/`](Monitor): design and
+implementation of the display, the plot-stream reader, and its two documents.
+
 Copyright 2026 Prajnaana Technologies Pvt. Ltd. — see [`LICENSE`](LICENSE).
 
 ---

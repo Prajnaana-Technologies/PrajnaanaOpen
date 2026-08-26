@@ -35,7 +35,7 @@
  * releasing means editing it here and tagging that commit.  There is
  * deliberately no build-time override -- one would let the same sources report
  * two different versions, which is exactly what traceability must exclude. */
-#define PPG_ANALYSIS_VERSION            "1.0.0"
+#define PPG_ANALYSIS_VERSION            "1.1.0"
 
 /* The program's own name, for the banner and every diagnostic.  The Makefile
  * passes -DPPG_PROG_NAME with the name of the binary it is writing, so a build
@@ -84,8 +84,8 @@
  *
  * The bandpass is AC-coupled, so its output swings about zero.  Re-centring on
  * the ADC full-scale value keeps the whole waveform positive with margin: the
- * largest negative excursion measured across both reference recordings was
- * -3262, leaving ~830 counts of headroom.
+ * largest negative excursion seen on the reference recordings still leaves
+ * several hundred counts of headroom.
  *
  * WHAT IT AFFECTS NOW, stated because it is less than it once was.  It was
  * introduced for an amplitude check that expressed its threshold as a ratio
@@ -131,20 +131,14 @@
  * numbers are not comparable and carrying 2.5 across would silently reject
  * half of every neonatal recording.
  *
- * Measured coverage/accuracy trade on the whitened spectrum (adults, 12
- * annotated recordings; neonatal coverage from the two neonatal recordings):
- *
- *      thresh   adult MAE   within-2   adult cov   neonatal cov
- *        2.5      0.64        97 %      131/156      74/140
- *        2.0      0.80        95 %      144/156     103/140
- *        1.7      1.11        93 %      149/156     129/140
- *        1.5      1.45        88 %      156/156     139/140   <-- selected
- *
- * 1.5 is chosen because it is the only value that regresses NOTHING against
- * the pre-whitening build (MAE 1.74, within-2 82 %, adult coverage 135/156,
- * neonatal 137/140): every one of those improves.  Raising it buys real
- * accuracy at the cost of coverage, and that is a product decision -- the curve
- * above is the input to it, not a law.
+ * Swept on the whitened spectrum against the annotated recordings, the
+ * threshold trades coverage for accuracy monotonically: raising it rejects more
+ * windows and the ones that survive are better.  1.5 is chosen because it is
+ * the only value on that curve that regresses NOTHING against the
+ * pre-whitening build -- error, within-2 and coverage all improve, on adults
+ * and neonates alike.  Raising it further buys real accuracy at the cost of
+ * coverage, and that is a product decision rather than a law.  The curve is in
+ * docs/DESIGN.md.
  *
  * Note what 1.5 implies: on adults the gate now never fires.  That is
  * informative rather than alarming.  Most of what it used to reject, it
@@ -201,12 +195,12 @@
  *
  * WHY THE SPECTRUM AND NOT THE OUTPUT: averaging the spectrum changes which
  * peak WINS.  Averaging the output cannot -- once the peak-picker has chosen a
- * sub-harmonic, no downstream filter recovers the fundamental.  Measured:
- * output mean-of-4 gives MAE 0.82 and output median-of-4 0.74, against 0.66 for
- * this.  That is also why [LAZARO-T] averages spectra where [LAZARO-13]
+ * sub-harmonic, no downstream filter recovers the fundamental.  Averaging the
+ * output was tried both as a mean and as a median and is worse than this either
+ * way.  That is also why [LAZARO-T] averages spectra where [LAZARO-13]
  * smoothed rates.
  *
- * ALPHA = 1/4.  Swept: 1/2 (0.78), 1/4 (0.66), 1/8 (0.78).  Note successive
+ * ALPHA = 1/4, the best of a sweep either side of it.  Note successive
  * windows overlap 87.5 %, so four of them are NOT four independent looks -- only
  * 12.5 % of each is new, and the effective span is ~90 s rather than 4 x 65.5.
  * That is why the gain is well short of the sqrt(4) that independent averaging
@@ -225,16 +219,16 @@
  * standard deviation is <= 4 bpm then RR is estimated as the mean, OTHERWISE NO
  * RR IS OUTPUT."  Spread_bpm is that standard deviation.  It was already being
  * computed and then ignored -- the estimate fell back to the single most
- * prominent surrogate instead of declining.  Measured over 612 windows, those
- * fall-back windows carry MAE 5.95 and 31 % sub-harmonic locking against 0.40
- * and 0.3 % when all three agree, so they are the worst rows in the output and
- * they were being reported with no mark on them. */
+ * prominent surrogate instead of declining.  Those fall-back windows are the
+ * worst rows the stage produces -- an order of magnitude more error than the
+ * windows where all three agree, and they lock onto a sub-harmonic a large
+ * fraction of the time -- and they were being reported with no mark on them. */
 #define RR_SPREAD_MAX_BPM           (4.0)
 
 /* Karlen's threshold is an ABSOLUTE 4 /min, measured on adults.  A neonatal
  * band spans 22-66 /min against the adult 4-30 -- 70 % wider -- and three
  * estimates of a 45 /min rate scatter proportionally more than three estimates
- * of a 16 /min one.  Applying 4 /min unchanged there declined more than half of
+ * of a 16 /min one.  Applying 4 /min unchanged there declines a large share of
  * all windows.  The threshold is therefore scaled by the declared band width,
  * anchored so that the ADULT band reproduces Karlen's number exactly.
  *
@@ -270,14 +264,14 @@
  * in-band harmonic to be confused with, so narrowing the search protects
  * against nothing and costs only responsiveness to a genuine rate change.
  * Applied unconditionally, as published, it repairs the slow-breathing record
- * (MAE 2.93 -> 1.02) but costs every other record 0.02 to 0.49 and the cohort
- * 0.47 -> 0.54.  Applied only below f_hi/2 it keeps the whole repair and costs
- * nothing: cohort 0.47 -> 0.42, within-2 98 -> 99 %, coverage 87 -> 91 %.
+ * but costs every other one a little and the cohort overall.  Applied only
+ * below f_hi/2 it keeps the whole repair and costs nothing -- error, within-2
+ * and coverage all improve.
  *
  * The condition is DERIVED from where the ambiguity can exist, not swept.
  *
- * CAVEAT ON THE EVIDENCE: the cohort contains exactly ONE slow breather, so
- * the entire measured gain rests on one recording.  The mechanism is sound and
+ * CAVEAT ON THE EVIDENCE: the annotated set contains exactly ONE slow breather,
+ * so the entire gain rests on one recording.  The mechanism is sound and
  * the cost elsewhere is nil, but this has not been demonstrated across a
  * population of slow breathers.
  * ------------------------------------------------------------------------- */
@@ -295,8 +289,28 @@
             ((RR_SPREAD_MAX_BPM * (double)((hi_) - (lo_)))              \
              / (double)RR_SPREAD_ANCHOR_SPAN_BPM)
 
-/* Two surrogates "agree" when they are within this many breaths/min. */
-#define RR_AGREEMENT_THRESHOLD      (3.0)
+/* Two surrogates "agree" when they are within this many breaths/min.
+ *
+ * FITTED, and the only value in this block that is: everything around it
+ * carries a citation.  Fitted on two thirds of the annotated recordings and
+ * reported on the third that was held back, which was not looked at until the
+ * value had been chosen.
+ *
+ * It is far tighter than it used to be because the surrogates changed
+ * character.  While the systolic peak sat off the crest and the onset was
+ * derived from it, the amplitude and baseline tracks were near-copies of each
+ * other -- agreeing to a small fraction of a breath per minute on nearly every
+ * recording -- and a loose threshold cost nothing because they agreed
+ * regardless.  Corrected, they
+ * disagree honestly, and a loose threshold then admits a pair that is merely
+ * close as though it were a pair that concurs.
+ *
+ * The fitting set is flat over a range either side of this value and falls off
+ * a cliff just above it, where the limits of agreement double.  This sits inside
+ * the plateau rather than at its edge, and coverage there is already the
+ * plateau's best.  On the held-back recordings the error, the within-2 rate and
+ * the limits of agreement all improve; the figures are in docs/DESIGN.md. */
+#define RR_AGREEMENT_THRESHOLD      (1.75)
 
 #define RRV_MAX_BREATHS             (128u)  /* breath intervals kept for RRV   */
 
@@ -431,11 +445,10 @@
  *            neighbours.  Band-free, and what the sources actually describe.
  *
  * MEASURED, and the difference is the whole decision.  Excluding vertices on
- * the BAND test costs the annotated adults settled RR MAE 0.42 -> 0.48 and
- * within-2 99 % -> 98 %.  Excluding them on the LOCAL test costs those figures
- * NOTHING -- 0.42, 99 %, the same 570 settled rows -- while still tightening
- * the neonatal recordings (one gains 3 reportable windows and its inter-quartile
- * range falls 7.48 -> 3.12 /min).
+ * the BAND test costs the annotated adults both error and within-2 accuracy.
+ * Excluding them on the LOCAL test costs those figures NOTHING, at the same
+ * number of settled rows, while still tightening the neonatal recordings --
+ * one gains reportable windows and its inter-quartile range more than halves.
  *
  * The knobs exist so that result can be reproduced rather than believed. */
 #ifndef RR_GATE_ON_BAND
@@ -450,7 +463,7 @@
 /* *********************************************************************************** *
  *                        THE MOVING AVERAGE -- ONE IMPLEMENTATION                      *
  *
- * Both smoothing stages in this program are the SAME filter: a causal trailing
+ * Both smoothing stages in this program are the SAME filter: a MID-POINT
  * average of N taps with a truncating integer divide.  They differ only in how
  * many taps and on which axis:
  *
@@ -459,19 +472,25 @@
  *                      RR_INTP_GRID_HZ               = 320 ms
  *
  * They are one implementation -- movavg_run() -- with one instance per stream,
- * so there is a single place that decides what a moving average does and a
- * single definition of its group delay.  They were once two separate pieces of
- * code with two different notions of "delay", and that is precisely how the
- * surrogate trace came to be published 2 grid points out of step with its own
- * raw column.  One filter, one delay, one place to correct it.
+ * so there is a single place that decides what a moving average does.  They were
+ * once two separate pieces of code with two different notions of "delay", and
+ * that is precisely how the surrogate trace came to be published 2 grid points
+ * out of step with its own raw column.  One filter, one rule for both.
  *
- * GROUP DELAY.  A causal average cannot centre its own output: the value for
- * sample n would need samples up to n + (N-1)/2, which have not arrived.  So it
- * runs late by movavg_group_delay() = (N-1)/2 taps, and each consumer puts its
- * own results back on the true time base -- the detectors subtract it from the
- * fiducial indices they report, and the surrogate trace labels each row at the
- * centre of the window it averaged.  No RATE is affected either way: a constant
- * delay cancels out of every interval, and a magnitude spectrum ignores phase.
+ * THE RULE.  An average of N taps describes the MIDDLE of its own window.  A
+ * stream can only offer the newest N samples, so the value handed back belongs
+ * to the sample movavg_group_delay() = (N-1)/2 behind the newest, and every
+ * consumer STORES IT THERE -- the detectors on the sample stream, the surrogate
+ * trace on its grid.  Stored that way the smoothed stream is on the true time
+ * base and nothing is corrected afterwards; a fiducial found on it is already
+ * where it belongs.  Storing it at the newest sample instead is what would make
+ * the average trailing, and would leave every fiducial (N-1)/2 late.
+ *
+ * The cost of a mid-point average is latency, never accuracy: a sample's value
+ * is not known until (N-1)/2 more have arrived.  And no RATE is affected by
+ * where it is stored -- a constant shift cancels out of every interval, and a
+ * magnitude spectrum ignores phase.  What the placement governs is each
+ * fiducial's absolute timestamp, and the sample its AMPLITUDE is read from.
  * *********************************************************************************** */
 #define MOVAVG_MAX_TAPS                 (63u)   /* 40 ms at up to ~1575 Hz      */
 #define RR_MVG_AVG_SAMPLE_CNT           5
@@ -571,9 +590,15 @@ typedef enum
  * the per-category sizing that determines them. */
 
 /* Raw-sample ring.  Deliberately NOT tied to RR_VERTEX_SAMPLE_SIZE: a beat
- * detector's history requirement is independent of the RR window, and
- * process_ppg_in_samples() primes with (PPG_RING_LEN - 1) samples out of a
- * 1024-entry block, so growing this would read past that block. */
+ * detector's history requirement is independent of the RR window.
+ *
+ * This length is the CEILING on how far behind the newest sample the trace may
+ * be held.  A detector names its fiducials retrospectively, so a row cannot be
+ * written until the detector can no longer reach back to it -- see
+ * how far back the detector reaches.  That reach is roughly one beat plus the
+ * detector's own reporting delay, and it scales with the sampling rate.  Beyond
+ * this length the ring would wrap under a reader and hand it the wrong sample,
+ * so a higher rate needs a longer ring. */
 #define PPG_RING_LEN          (1024u)
 
 /* Surrogate grid buffer.  FIXED, and deliberately independent of the selected
@@ -584,11 +609,11 @@ typedef enum
  * statically allocated design must not do. */
 #define INTP_MAVG_BUFF_SIZE     (RR_MAX_WINDOW_PTS * 2u)   /* 2048 grid points */
 /* How far the analysis window slides between reports.  This sets the REPORTING
- * CADENCE only -- it does not touch a single estimate.  Proved directly: slide
- * 128 and slide 256 over the same window and segment give 336 matched instants
- * with 0 differences, max difference 0.000000.  Any MAE difference between two
- * slide settings is therefore a sampling artefact of which instants happened to
- * be scored, never an accuracy difference.
+ * CADENCE only -- it does not touch a single estimate.  Proved directly: two
+ * different slide settings over the same window and segment agree exactly at
+ * every instant they both report.  Any accuracy difference between two slide
+ * settings is therefore a sampling artefact of which instants happened to be
+ * scored, never a real one.
  *
  * 128 grid points = 8.2 s at the 125 Hz design point, against 32.8 s for the
  * previous half-window slide.  Cost is ~4x the per-window work, which is a few
@@ -643,18 +668,13 @@ typedef enum
  * RR_VERTEX_SAMPLE_SIZE grid points are then analysed.  If N is a FIXED sample
  * count, the analysis window is (RR_VERTEX_SAMPLE_SIZE * N / fs) SECONDS -- a
  * duration that slides with the input sampling rate.  Held at 8, that is
- * is correct only at the 125 Hz design point.  Measured, same recordings, only
- * the rate changed:
+ * is correct only at the 125 Hz design point.  Re-run on the same recordings
+ * with only the declared rate changed, accuracy degrades steadily as the rate
+ * rises: at three times the design rate the analysis window has shrunk to a
+ * third of its intended duration and the Welch bin has widened threefold.
  *
- *      fs      grid      window    Welch bin    RR MAE
- *     100 Hz   12.50 Hz   81.9 s   2.93 /min     1.72
- *     125 Hz   15.63 Hz   65.5 s   3.66 /min     1.81   <-- design point
- *     250 Hz   31.25 Hz   32.8 s   7.32 /min     2.16
- *     367 Hz   45.88 Hz   22.3 s  10.75 /min     3.05   <-- 69 % worse
- *
- * Nothing physiological changed; the window shrank to 22 s and the Welch bin
- * widened to 10.75 breaths/min, so the estimator read the respiratory peak
- * through a coarser grid over fewer breaths.  Fixing the GRID RATE instead of
+ * Nothing physiological changed; the estimator simply read the respiratory peak
+ * through a coarser grid over fewer breaths.  The table is in docs/DESIGN.md.  Fixing the GRID RATE instead of
  * the decimation keeps the window at ~65 s for any input rate, which is what
  * every measured figure in docs/DESIGN.md was obtained at.
  *
@@ -688,6 +708,8 @@ typedef struct  tag_data_buf
     int32_t             input_sample;     /* as read, after -nu scaling        */
     int32_t             filtered_sample;  /* after the band-pass, BEFORE the MA */
     int32_t             smoothed_sample;  /* after the MA -- what it detects on */
+    int32_t             it_is_peak;       /* = 1 if this sample is the PPG-Peak */
+    int32_t             it_is_foot;       /* = 1 if this sample is the PPG-Foot */
 
 } struct_data_buf;
 
@@ -782,7 +804,14 @@ typedef struct  tag_ppg_analysis
     int32_t     rr_track_count;         /* consecutive agreements, <= MAX     */
     uint32_t    sel_rr_welch_overlap;   /* = 75 % of the segment              */
     uint32_t    sel_rr_slide_pts;       /* window advance between reports     */
-    uint32_t    samples_processed;
+    /* Resolved from the subject at init; see struct_subject_band. */
+    uint32_t    sel_psd_accum_n;
+    double      sel_agree_bpm;
+    uint32_t    sel_prog_min_pts;
+    double      sel_min_prominence;
+
+    uint32_t    samples_processed;   /* rows written to the trace         */
+    uint32_t    samples_fed;         /* samples handed to the detector    */
 
     /* Beat-interval sanitiser state (HR path). */
     uint32_t    ibi_last_valid_ms;
@@ -915,6 +944,31 @@ typedef struct
     int32_t     detector;           /* an enum_fiducial; int32_t keeps this
                                      * header free of ppg_fiducial.h          */
 
+    /* ---- values that are functions of the subject, not of the build -------
+     *
+     * Each of these was a constant in a shared header, and each is meaningful
+     * only against a quantity that differs per category.  The accumulation
+     * depth counts windows, but what it is really counting is how far the rate
+     * may drift before it leaves a frequency bin, and a bin is 1.83 /min for an
+     * adult and 7.32 for a neonate.  The agreement tolerance and the prominence
+     * floor are read against the same bins.  The band-pass corners were derived
+     * from the respiratory band -- the 0.02 Hz lower corner exists because the
+     * adult floor of 4 /min is 0.067 Hz, and a neonate's 22 /min is 0.37 Hz.
+     * The smoothing span is a fraction of a pulse, and pulses differ by two to
+     * one across these categories.
+     *
+     * They are carried here so the one place that resolves the subject resolves
+     * them too.  Every category currently holds the value its build already
+     * used, so naming them changes nothing; what it changes is that they can
+     * now be answered per subject instead of per binary. */
+    uint32_t    psd_accum_n;        /* windows in the spectral average        */
+    double      agree_bpm;          /* surrogates concur within this, /min    */
+    uint32_t    prog_min_pts;       /* smallest window that may report        */
+    double      min_prominence;     /* peak must stand this far above local   */
+    double      bp_hp_corner_hz;    /* band-pass corners, Hz                  */
+    double      bp_lp_corner_hz;
+    double      smooth_ms;          /* post-filter moving average, ms         */
+
 } struct_subject_band;
 
 /**
@@ -926,6 +980,18 @@ typedef struct
  *                      interval limits and the Welch overlap are derived here,
  *                      so no caller has to compute them.
  */
+/**
+ * @brief Hand the subject's band-pass corners and smoothing span to the filter.
+ *
+ * Called before any filter is designed.  Defaults are the built-in values, so
+ * not calling it reproduces the shared header exactly.
+ *
+ * @param hp_hz     Band-pass lower corner, Hz
+ * @param lp_hz     Band-pass upper corner, Hz
+ * @param smooth_ms Post-filter moving average span, ms
+ */
+void    filter_configure (double hp_hz, double lp_hz, double smooth_ms);
+
 void    ppg_analysis_init (struct_ppg_analysis *ps_ppg,
                            int32_t fs_hz,
                            const struct_subject_band *ps_band);

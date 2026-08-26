@@ -15,19 +15,18 @@
  *
  * WHY THE CHOICE IS RUNTIME AND NOT A BUILD FLAG.  Which detector is better
  * depends on the patient, and the patient type is already selected at run time.
- * Measured against an independent reference on the neonatal pair:
- *
- *                      TERMA           IMS
- *      sensitivity     88-89 %         94-96 %
- *      raw heart rate  9-11 % LOW      within 1.3 %
- *      raw SDNN        ~2x reference   within 6 %
- *      raw RMSSD       ~2x reference   within 9 %
- *
- * The beats TERMA misses at neonatal rates arrive as DOUBLED intervals, which
- * is why its rate reads low and its variability measures inflate.  On adults
- * the ranking reverses (TERMA F1 98.7 against 96.6) because IMS over-detects
- * there.  One compile-time choice cannot serve both, and shipping two binaries
- * is exactly what the patient-type knob exists to avoid.
+ * Scored against an independent reference at neonatal rates, IMS finds more of
+ * the beats.  TERMA at those rates misses beats, and the misses arrive as
+ * doubled -- sometimes tripled -- intervals.  sanitize_ibi() splits those, so
+ * the REPORTED RATE survives and reads correctly under either detector; what
+ * does not survive is the beat COUNT, the raw interval spread the variability
+ * measures are built from, and the respiratory coverage, which needs an
+ * unbroken beat series.  The failure is therefore silent in the rate itself,
+ * and only the beat count reveals it.  On adults the ranking reverses: IMS
+ * finds the beats too, but adds ones that are not there, so it gives up
+ * positive predictive value rather than sensitivity.  The figures are in
+ * docs/RESULTS.md.  One compile-time choice cannot serve both, and shipping
+ * two binaries is exactly what the patient-type knob exists to avoid.
  *
  * The cost is that both detectors' state is always resident.  TERMA's history
  * buffers dominate it at about 13 KB; IMS's state is a few hundred bytes.  That
@@ -66,7 +65,7 @@ static const struct_fiducial_entry g_fiducial [FIDUCIAL_COUNT] = {
 
     { "ims",
       "Karlen 2012 incremental-merge segmentation (ppg_fiducial_karlen_ims.c)",
-      ims_fiducial_init,   ims_fiducial_process_sample   },
+      ims_fiducial_init,   ims_fiducial_process_sample },
 };
 
 /* Which one is live for the current recording.  Held as a pointer rather than
@@ -157,6 +156,7 @@ void    fiducial_process_sample (struct_fiducial *ps_fd, int32_t sample_value)
     return;
 }
 
+
 /**
  * @brief Band power at one frequency, by the Goertzel recurrence.
  *
@@ -239,9 +239,9 @@ uint32_t fiducial_period_is_fundamental (const struct_fiducial *ps_fd,
     for (i = 0u; i < n; i++) { window[i] -= mean; }
 
     /* A doubled train puts the fundamental at half the candidate, so that is
-     * where the energy would be.  Sweeping the whole band instead was measured
-     * and is WORSE -- it defers genuine cases long enough to spoil them (two
-     * records fell 197->140 and 192->150 bpm) and solves nothing. */
+     * where the energy would be.  Sweeping the whole band instead was tried and
+     * is WORSE: it defers genuine cases long enough to spoil them, dragging a
+     * correct rate down with the doubled one, and solves nothing. */
     return ((goertzel_power (window, n, cand_hz,       fs_hz) >=
              goertzel_power (window, n, cand_hz / 2.0, fs_hz)) ? 1u : 0u);
 }

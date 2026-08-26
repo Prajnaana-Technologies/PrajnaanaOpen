@@ -157,7 +157,9 @@ typedef struct
 } struct_ims_line;
 
 static  int32_t     ims_hist [IMS_HIST];    /* recent filtered samples        */
-static  uint32_t    ims_wr;                 /* samples seen so far            */
+static  uint32_t    ims_wr;                 /* index of the CENTRED sample    */
+static  uint32_t    ims_n;                  /* samples fed; ims_wr trails it by
+                                             * the smoothing half-width        */
 
 static  uint32_t    ims_m;                  /* segment length in samples      */
 static  uint32_t    ims_th_t_samples;       /* ThT expressed in samples       */
@@ -190,6 +192,19 @@ static  uint32_t    ims_prev_steep_valid;
 
 static  void       *ims_user;
 static  uint32_t    ims_rate;
+
+/* Longest a single line may run before it is closed by force.  A line is a
+ * monotonic stretch, and no part of a pulse lasts anything like two whole
+ * cardiac cycles.  One cycle was tried and is too tight: it breaks lines the
+ * detector had legitimately merged, and the beat count moves.  Without any
+ * bound at all a flat or slowly drifting stretch merges segment after segment
+ * into one line that never ends, and because a line's start is the foot the
+ * detector may still report, the oldest sample it can name recedes without
+ * limit -- on poor recordings far enough back that the sample ring no longer
+ * holds it, so the trace would read slots a later sample had already
+ * overwritten.  Derived from the subject's slowest expected beat, which is why
+ * this detector needs the heart-rate band it previously discarded. */
+static  uint32_t    ims_max_line;
 
 /**
  * @brief Fetch a sample from the history ring by absolute index.
@@ -268,7 +283,7 @@ static void ims_adapt (const struct_ims_line *p_line)
  * the peak is its end ("pulse peaks are identified as endpoints of the
  * validated up-slopes").
  */
-static void ims_emit (const struct_ims_line *p_up, int32_t next_type)
+static void ims_emit (struct_fiducial *ps_fd, const struct_ims_line *p_up, int32_t next_type)
 {
     uint32_t ibi_samples;
     uint32_t ibi_ms;
@@ -305,17 +320,24 @@ static void ims_emit (const struct_ims_line *p_up, int32_t next_type)
 
     /* Accepted.  Foot first -- it closes the cycle that began at the previous
      * foot, so it carries that cycle's maximal-upslope instant. */
-    /* Indices are reported on the RAW sample time base -- the smoothing stage
-     * is causal, so subtract its group delay.  See chebyshev_t2_o4.c. */
+    /* No time-base correction here.  The smoothed stream is stored at the sample
+     * each average describes, so every index found on it is already where it
+     * belongs.  See the block comment beside struct_movavg in ppg_common.h. */
     {
-        uint32_t gd    = smooth_group_delay();
-        uint32_t f_idx = (p_up->start_index > gd) ? (p_up->start_index - gd) : 0u;
-        uint32_t p_idx = (p_up->end_index   > gd) ? (p_up->end_index   - gd) : 0u;
-        uint32_t s_idx = (ims_prev_steep_index > gd) ? (ims_prev_steep_index - gd) : 0u;
+        uint32_t f_idx = p_up->start_index;
+        uint32_t p_idx = p_up->end_index;
+        uint32_t s_idx = ims_prev_steep_index;
 
         ppg_on_foot (ims_user, f_idx, p_up->start_value,
                      s_idx, ims_prev_steep_valid);
+
         ppg_on_peak (ims_user, p_idx, p_up->end_value);
+
+        /* Update the flags related to peak and foot */
+        ps_fd->s_data_buf [p_idx % PPG_RING_LEN].it_is_peak = 1;
+        ps_fd->s_data_buf [f_idx % PPG_RING_LEN].it_is_foot = 1;
+        ps_fd->peak_count++;
+        ps_fd->foot_count++;
     }
 
     ims_prev_steep_index = p_up->steep_index;
@@ -324,10 +346,11 @@ static void ims_emit (const struct_ims_line *p_up, int32_t next_type)
     return;
 }
 
+
 /**
  * @brief Finalise the line under construction: classify, adapt, emit.
  */
-static void ims_finalise (void)
+static void ims_finalise (struct_fiducial *ps_fd)
 {
     struct_ims_line line = ims_cur;
 
@@ -347,7 +370,7 @@ static void ims_finalise (void)
         {
             ims_adapt (&ims_pending);
         }
-        ims_emit (&ims_pending, line.type);
+        ims_emit (ps_fd, &ims_pending, line.type);
         ims_pending_valid = 0u;
     }
 
@@ -384,7 +407,7 @@ static void ims_finalise (void)
  *                      the user pointer; the interface is shared with the
  *                      alternative implementation.
  * @param fs_hz Sample rate of the PPG stream, Hz
- * @param hr_min_bpm    Expected heart-rate band, unused -- see above
+ * @param hr_min_bpm    Lowest expected heart rate; bounds the longest line
  * @param hr_max_bpm    Expected heart-rate band, unused -- see above
  * @param user          Opaque pointer handed to every callback
  */
@@ -394,7 +417,6 @@ void    ims_fiducial_init (struct_fiducial *ps_fd,
                        uint32_t hr_max_bpm,
                        void    *user)
 {
-    (void)hr_min_bpm;
     (void)hr_max_bpm;
 
     memset(ps_fd, 0x00, sizeof(struct_fiducial));
@@ -405,6 +427,8 @@ void    ims_fiducial_init (struct_fiducial *ps_fd,
     ims_wr = 0u;
     ims_rate = (uint32_t)fs_hz;
     ims_user = user;
+    ims_max_line = (0u < hr_min_bpm) ? ((2u * 60u * (uint32_t)fs_hz) / hr_min_bpm)
+                                     : (2u * (uint32_t)fs_hz);
 
     /* m is not given by the paper.  Tie it to ThT, the one duration that is,
      * so a line segment is a fraction of the shortest classifiable line. */
@@ -419,6 +443,7 @@ void    ims_fiducial_init (struct_fiducial *ps_fd,
     ims_th_low = 0.0; ims_th_high = 0.0; ims_th_init = 0u; ims_lambda = 0u;
     ims_cur_open = 0u; ims_prev_valid = 0u; ims_pending_valid = 0u;
     ims_pending_prev_type = IMS_LINE_NONE;
+    ims_n = 0u;
     ims_last_beat_index = 0u; ims_last_ibi_samples = 0u;
     ims_prev_steep_index = 0u; ims_prev_steep_valid = 0u;
     memset(&ims_cur, 0x00, sizeof(ims_cur));
@@ -428,9 +453,12 @@ void    ims_fiducial_init (struct_fiducial *ps_fd,
     printf("=== Beat detector: Karlen Incremental-Merge Segmentation (EMBC 2012) ===\n");
     printf("segment length m = %u samples, ThT = %u samples (%.3f s), fs = %d Hz\n",
            ims_m, ims_th_t_samples, IMS_TH_T_SEC, fs_hz);
+    printf("longest line = %u samples (two beats at %u /min)\n",
+           ims_max_line, hr_min_bpm);
     printf("adaptation parameters are ASSUMED -- not given in the source paper\n\n");
 
     init_chebyshev_filter(fs_hz);
+
     return;
 }
 
@@ -446,6 +474,7 @@ void    ims_fiducial_process_sample (struct_fiducial *ps_fd, int32_t sample_valu
 {
     int32_t  band_only;
     int32_t  filtered;
+    uint32_t gd;
     uint32_t seg_start;
     uint32_t seg_end;
     int32_t  seg_amp;
@@ -456,13 +485,33 @@ void    ims_fiducial_process_sample (struct_fiducial *ps_fd, int32_t sample_valu
      * only the smoothed sample is used for detection. */
     band_only = (int32_t)(filter_int_sample(sample_value) + PPG_FILTER_DC_PEDESTAL);
     filtered  = smooth_int_sample(band_only);
+    gd        = smooth_group_delay();
+
+    /* Raw and band-passed describe the sample that has just arrived, so they go
+     * in at its own index.  The smoothed column is filled in below, at the index
+     * the centred average actually describes; until then the band-passed value
+     * stands in, so a row never holds stale ring content. */
+    ps_fd->s_data_buf[ims_n % PPG_RING_LEN].input_sample     = sample_value;
+    ps_fd->s_data_buf[ims_n % PPG_RING_LEN].filtered_sample  = band_only;
+    ps_fd->s_data_buf[ims_n % PPG_RING_LEN].smoothed_sample  = band_only;
+    ps_fd->s_data_buf[ims_n % PPG_RING_LEN].it_is_peak       = 0;
+    ps_fd->s_data_buf[ims_n % PPG_RING_LEN].it_is_foot       = 0;
+    ims_n++;
+    ps_fd->ring_wr_pos = ims_n;
+
+    /* MID-POINT.  A moving average describes the middle of its own window, so
+     * `filtered` is the average about the sample one half-width back, and that is
+     * the index it is stored at.  Everything found on this stream is then on
+     * the true time base and nothing has to be corrected afterwards.  Until
+     * `ims_n` has passed the half-width there is no such sample to store it at. */
+    if (ims_n <= gd)
+    {
+        return;
+    }
 
     ims_hist[ims_wr % IMS_HIST] = filtered;
-    ps_fd->s_data_buf[ims_wr % PPG_RING_LEN].input_sample     = sample_value;
-    ps_fd->s_data_buf[ims_wr % PPG_RING_LEN].filtered_sample  = band_only;
-    ps_fd->s_data_buf[ims_wr % PPG_RING_LEN].smoothed_sample  = filtered;
+    ps_fd->s_data_buf[ims_wr % PPG_RING_LEN].smoothed_sample = filtered;
     ims_wr++;
-    ps_fd->ring_wr_pos = ims_wr;
 
     /* Need at least m+1 samples before a segment can be formed.  Using
      * (ims_m > ims_wr) here would let seg_start = seg_end - ims_m underflow on
@@ -485,15 +534,17 @@ void    ims_fiducial_process_sample (struct_fiducial *ps_fd, int32_t sample_valu
     }
     else
     {
-        /* Merge when the slope signs agree, per Algorithm 1. */
+        /* Merge when the slope signs agree, per Algorithm 1, and only while
+         * the line is still short enough to be part of one pulse. */
         int32_t cur_amp = ims_cur.amplitude;
         int      same   = (((0 < cur_amp) && (0 < seg_amp)) ||
                            ((0 > cur_amp) && (0 > seg_amp)) ||
                            ((0 == cur_amp) && (0 == seg_amp)));
+        int      spent  = ((seg_end - ims_cur.start_index) > ims_max_line);
 
-        if (0 == same)
+        if ((0 == same) || (0 != spent))
         {
-            ims_finalise();
+            ims_finalise(ps_fd);
             ims_cur.start_index = seg_start;
             ims_cur.start_value = ims_sample(seg_start);
             ims_cur.steep_rise  = 0;

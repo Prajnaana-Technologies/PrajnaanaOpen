@@ -31,6 +31,8 @@ extern  uint32_t gate_breath_intervals (double *p_bbi, uint8_t *p_adj, uint32_t 
 extern  int     compute_rrv (const double *p_bbi, const uint8_t *p_adj, uint32_t cnt,
                              double *p_sd, double *p_rmssd, double *p_cv_pct);
 extern  FILE    *fp_rr;
+/* The live plot stream, or NULL unless -p on.  Owned by ppg_main.c. */
+extern  FILE    *fp_data;
 
 static  double  intp_foot  [RR_MAX_WINDOW_PTS];
 static  double  am_signal  [RR_MAX_WINDOW_PTS];
@@ -441,7 +443,7 @@ static  double  compute_rr (struct_ppg_analysis *ps_ppg, struct_intp *ps_intp,
         }
         else
         {
-            const double alpha = 1.0 / (double)RR_PSD_ACCUM_N;
+            const double alpha = 1.0 / (double)ps_ppg->sel_psd_accum_n;
 
             for (kk = k_lo; kk <= k_hi; kk++)
             {
@@ -483,7 +485,8 @@ static  double  compute_rr (struct_ppg_analysis *ps_ppg, struct_intp *ps_intp,
  * weight favouring FM was built and measured.  It helped on neonatal data and
  * hurt monotonically across the annotated adult reference set, where FM is in
  * fact the WORST surrogate here (reference/estimate median 1.54 against 1.04
- * for BW; FM sits at half the true rate in 29 % of windows).  The prior was
+ * for BW; FM sits at half the true rate in a sizeable minority of windows).
+ * The prior was
  * therefore removed rather than left disabled.  It is worth revisiting only
  * once FM is computed Liu's way -- see docs/DESIGN.md.
  *
@@ -509,6 +512,7 @@ void    estimate_resp_rate (struct_ppg_analysis *ps_ppg)
     double      qy [INTERPOLATE_INDEX_MAX];
     double      acc [INTERPOLATE_INDEX_MAX];
     double      final_rr = -1.0, sum, wsum, spread = -1.0;
+    double      rrv_rr   = -1.0;
     double      td_rr    = -1.0;
     const char  *method  = "NONE";
     uint32_t    n_used   = 0u;
@@ -538,9 +542,9 @@ void    estimate_resp_rate (struct_ppg_analysis *ps_ppg)
         }
         else
         {
-            uint32_t p2 = RR_PROG_MIN_PTS;
+            uint32_t p2 = ps_ppg->sel_prog_min_pts;
 
-            if (avail < RR_PROG_MIN_PTS) { return; }
+            if (avail < ps_ppg->sel_prog_min_pts) { return; }
             while (((p2 * 2u) <= avail) && ((p2 * 2u) <= ps_ppg->sel_rr_window_full))
             {
                 p2 *= 2u;
@@ -591,7 +595,7 @@ void    estimate_resp_rate (struct_ppg_analysis *ps_ppg)
      */
     for (i = 0; i < INTERPOLATE_INDEX_MAX; i++)
     {
-        if ((rr[i] > 0.0) && (qy[i] >= RR_MIN_PEAK_PROMINENCE))
+        if ((rr[i] > 0.0) && (qy[i] >= ps_ppg->sel_min_prominence))
         {
             acc[n_used] = (double)i;
             n_used++;
@@ -605,7 +609,7 @@ void    estimate_resp_rate (struct_ppg_analysis *ps_ppg)
          * number here is exactly what made the output look erratic; report the
          * window as unusable instead. */
         printf(" ==> NO credible respiratory peak in this window (all q < %.1f) -- REJECTED\n",
-               RR_MIN_PEAK_PROMINENCE);
+               ps_ppg->sel_min_prominence);
         method = "REJECTED";
 
         /* RRV is derived from the winning surrogate's breath timings.  With no
@@ -638,7 +642,8 @@ void    estimate_resp_rate (struct_ppg_analysis *ps_ppg)
          * counting breaths you would have to miss every second breath, whereas
          * a periodogram finds a half-rate peak whenever the modulation depth
          * alternates slightly or a 1/f skirt reaches into the band.  Measured:
-         * 0 % sub-harmonic reports from the time-domain estimate against 13-15 %
+         * no sub-harmonic reports at all from the time-domain estimate, against a
+         * steady trickle
          * from the fusion.  The DFT also assumes the rate is CONSTANT across
          * the window, which over 65.5 s it is not -- that variation is exactly
          * what RRV measures -- while interval counting handles it natively.
@@ -647,12 +652,13 @@ void    estimate_resp_rate (struct_ppg_analysis *ps_ppg)
          *
          * It still does NOT vote in the fusion.  Adding it as a fourth vote was
          * built and measured: it gained almost nothing on adults (3.39 -> 3.36,
-         * the agreement gate admitting it in only 18 of 150 windows -- exactly
+         * the agreement gate admitting it in only a small minority of windows --
+         * exactly
          * those where it already agreed) and it degraded the neonatal pair,
-         * where it runs ~20 % high (err 5.80/5.99 vs 2.19/1.42 spectral) because
+         * where it runs high against the spectral estimate because
          * fewer samples per breath means more spurious crossings.  Its only
          * influence is the sub-harmonic rescue below, which fires on the 2:1
-         * signature alone -- 10 of 135 adult windows, and NEVER on the neonatal
+         * signature alone -- a handful of adult windows, and NEVER on the neonatal
          * pair, so that weakness is not reintroduced. */
         ps_ppg->bbi_cnt = extract_breath_intervals (
                                   filt_keep[best], (int)ps_ppg->sel_rr_window_pts, intp_fs,
@@ -714,7 +720,7 @@ void    estimate_resp_rate (struct_ppg_analysis *ps_ppg)
         for (i = 0; i < (int32_t)n_used; i++)
         {
             int32_t idx = (int32_t)acc[i];
-            if (fabs(rr[idx] - rr[best]) <= RR_AGREEMENT_THRESHOLD)
+            if (fabs(rr[idx] - rr[best]) <= ps_ppg->sel_agree_bpm)
             {
                 sum  += rr[idx] * qy[idx];
                 wsum += qy[idx];
@@ -734,9 +740,9 @@ void    estimate_resp_rate (struct_ppg_analysis *ps_ppg)
          *
          *   k < 2         only ONE surrogate agreed with the most prominent
          *                 one.  There is no corroboration, and these are the
-         *                 worst rows in the output by a wide margin -- MAE
-         *                 5.95 and 31 % sub-harmonic locking, against 0.40 and
-         *                 0.3 % when all three agree.
+         *                 worst rows in the output by a wide margin, both in
+         *                 error and in how often they lock onto a sub-harmonic,
+         *                 against the windows where all three agree.
          *   spread > 4    the three disagree by more than Karlen's threshold.
          *
          * A DECLINED window is reported as such rather than replaced by a
@@ -772,8 +778,9 @@ void    estimate_resp_rate (struct_ppg_analysis *ps_ppg)
              *
              * k < 2 -- no corroboration -- is a statement about the EVIDENCE,
              * not about how much data there is, so it declines at any stage.
-             * Measured on warm-up rows alone: MAE 6.20 and 40 % sub-harmonic
-             * locking, so these are not merely uncertain, they are wrong.
+             * On warm-up rows alone they carry an order of magnitude more error
+             * than a corroborated row and lock onto a sub-harmonic much of the
+             * time, so these are not merely uncertain, they are wrong.
              *
              * The spread threshold applies only once settled: a warm-up row is
              * already marked provisional and declining it as well would push
@@ -781,13 +788,36 @@ void    estimate_resp_rate (struct_ppg_analysis *ps_ppg)
             double spread_limit = RR_SPREAD_LIMIT(ps_ppg->sel_rr_min_bpm,
                                                   ps_ppg->sel_rr_max_bpm);
 
-            if ((k < 2) ||
-                ((0u != ps_ppg->rr_warmup_done) &&
-                 (nv2 > 1) && (v2 > spread_limit)))
+            if (k < 2)
             {
-                printf(" ==> DECLINED: %s, surrogate spread %.2f /min "
+                /* One witness.  No other surrogate concurred, and rows in that
+                 * state are the worst this stage produces, so no rate is
+                 * reported -- that much is unchanged.
+                 *
+                 * What IS kept is the period the window would have reported,
+                 * because the variability figures need a rhythm to narrow the
+                 * breath intervals against and nothing else can supply one.
+                 * Withholding it as well cost reportable variability on the
+                 * neonatal recordings, where more than half the windows have a
+                 * single witness, and keeping the period roughly doubles what
+                 * is reportable there.  A spread is a weaker claim
+                 * than a rate and survives a rate this rough; publishing the
+                 * rate itself alongside it does not -- measured, that doubled
+                 * the limits of agreement and multiplied sub-harmonic locking
+                 * eightfold. */
+                printf(" ==> ONE WITNESS: no other surrogate corroborated, "
+                       "spread %.2f /min -- no rate reported, RRV retained\n", v2);
+                rrv_rr   = final_rr;
+                method   = "DECLINED";
+                final_rr = -1.0;
+                /* An uncorroborated window may not steer the four that follow. */
+                memcpy(psd_ema, psd_undo, sizeof(psd_ema));
+            }
+            else if ((0u != ps_ppg->rr_warmup_done) &&
+                     (nv2 > 1) && (v2 > spread_limit))
+            {
+                printf(" ==> DECLINED: surrogates disagree, spread %.2f /min "
                        "(limit %.1f) -- no rate reported for this window\n",
-                       (k < 2) ? "only one surrogate corroborated" : "surrogates disagree",
                        v2, spread_limit);
                 method   = "DECLINED";
                 final_rr = -1.0;
@@ -809,16 +839,16 @@ void    estimate_resp_rate (struct_ppg_analysis *ps_ppg)
          * available estimate that is structurally immune to this failure and can
          * be used as a witness against it.
          * The dominant error of the fused estimate is not a bias but a
-         * half-rate lock.  Measured over 151 windows on the 12 annotated
-         * recordings: 85 % of windows carry bias -0.22 and MAE 0.93, while
-         * 15 % report close to HALF the true rate with a mean error of -10.74
-         * -- those alone accounting for -1.57 of the -1.76 overall bias.  It
-         * is a discrete failure to be caught, not an offset to correct.
+         * half-rate lock.  Across the annotated recordings most windows carry
+         * a small error and almost no bias, while a minority report close to
+         * HALF the true rate -- and that minority accounts for nearly all of
+         * the overall bias by itself.  It is a discrete failure to be caught,
+         * not an offset to correct.
          *
          * It is not physiology: reference breath intervals in the failing
-         * windows are as regular as everywhere else (interval CV 0.082 vs
-         * 0.086) and show LESS long/short alternation (32 % vs 46 %), so there
-         * is no real energy at half the breathing rate to have found.
+         * windows are as regular as everywhere else, and show LESS long/short
+         * alternation, so there is no real energy at half the breathing rate to
+         * have found.
          *
          * The fusion cannot catch it alone because AM and BW are both
          * AMPLITUDE surrogates of the same waveform -- baseline wander
@@ -832,17 +862,17 @@ void    estimate_resp_rate (struct_ppg_analysis *ps_ppg)
          * separated by less than the estimator's own resolution are
          * indistinguishable from an exact 2:1 ratio, and it rescales with the
          * sampling rate and the Welch segment automatically.  Widening to 2 bins
-         * was measured -- MAE 1.74 -> 1.59, but firing on 27 windows instead
-         * of 10 and costing within-2 accuracy (82 % -> 78 %).  That is a
+         * was tried: it lowers the average error but fires on nearly three
+         * times as many windows and costs within-2 accuracy.  That is a
          * threshold chasing one dataset, so it is not taken. */
         /* NOT DURING WARM-UP.  Both rescues compare the spectral estimate with
          * the breath count, and that comparison assumes the fundamental was
          * inside the searched band.  While the window is short the floor has
          * been raised above the subject's declared one, so the fundamental may
          * be excluded by construction and the ratio test then fires on a rate
-         * the search could never have found.  Measured on warm-up rows: MAE
-         * 6.26 and 43 % sub-harmonic locking when the rescue was allowed to
-         * run there. */
+         * the search could never have found.  Allowed to run on warm-up rows it
+         * produces large errors and locks onto a sub-harmonic in a large
+         * fraction of them. */
         if ((td_rr > 0.0) && (final_rr > 0.0) && (0u != ps_ppg->rr_warmup_done))
         {
             double bin_bpm = (intp_fs * 60.0) / (double)ps_ppg->sel_rr_welch_seg;
@@ -863,16 +893,16 @@ void    estimate_resp_rate (struct_ppg_analysis *ps_ppg)
                  * outside the search entirely and there is nothing to recover.
                  *
                  * The test is a RATIO, not a 2:1 match, because the lock is not
-                 * confined to the second harmonic.  Measured on a slow-breathing
-                 * true rate is 5.3-6.6 /min, the surrogates reported 12-27 --
-                 * the 2nd, 3rd and 4th harmonics -- while TD_RR read 5.9-9.0.
-                 * A guard that only recognised 2:1 fired on 0 of those windows.
+                 * confined to the second harmonic.  On a slow-breathing subject
+                 * the surrogates were found on the 2nd, 3rd and 4th harmonics
+                 * while the breath count stayed near the true rate, and a guard
+                 * that only recognised 2:1 fired on none of those windows.
                  *
                  * RR_HARMONIC_RATIO is 1.8 rather than 2.0 so that a harmonic
                  * lock is still caught when the fused value has been pulled
                  * slightly below an exact multiple by the agreement average.
                  * Swept: 1.6, 1.8 and 2.2 all give the same result on this
-                 * cohort (MAE 0.84-0.89), so it is not a sharp threshold. */
+                 * annotated recordings, so it is not a sharp threshold. */
                 final_rr = td_rr;
                 method   = "TD_HARM";
             }
@@ -883,6 +913,8 @@ void    estimate_resp_rate (struct_ppg_analysis *ps_ppg)
                final_rr, k, method,
                (best == INTERPOLATE_AM) ? "AM" : ((best == INTERPOLATE_BW) ? "BW" : "FM"),
                qy[best], td_rr);
+
+        if (final_rr > 0.0) { rrv_rr = final_rr; }
 
         /* ---- RRV from the same breath timings extracted above -----------
          *
@@ -898,7 +930,7 @@ void    estimate_resp_rate (struct_ppg_analysis *ps_ppg)
             ps_ppg->bbi_cnt = gate_breath_intervals (
                                       ps_ppg->bbi_ms, ps_ppg->bbi_adj,
                                       ps_ppg->bbi_cnt,
-                                      (final_rr > 0.0) ? (60000.0 / final_rr) : 0.0,
+                                      (rrv_rr > 0.0) ? (60000.0 / rrv_rr) : 0.0,
                                       &gated_mean_ms);
 
             if (0 == compute_rrv (ps_ppg->bbi_ms, ps_ppg->bbi_adj,
@@ -912,8 +944,8 @@ void    estimate_resp_rate (struct_ppg_analysis *ps_ppg)
                 ps_ppg->rrv_rmssd_ms = RRV_NOT_REPORTABLE;
                 ps_ppg->rrv_cv_pct   = RRV_NOT_REPORTABLE;
             }
-            else if ((gated_mean_ms <= 0.0) ||
-                     (fabs ((60000.0 / gated_mean_ms) - final_rr) > bin_bpm))
+            else if ((gated_mean_ms <= 0.0) || (rrv_rr <= 0.0) ||
+                     (fabs ((60000.0 / gated_mean_ms) - rrv_rr) > bin_bpm))
             {
                 /* The surviving intervals average to a rate the row does not
                  * report.  Emitting their spread here would attach a
@@ -922,7 +954,7 @@ void    estimate_resp_rate (struct_ppg_analysis *ps_ppg)
                 printf(" ==> RRV: interval mean %.2f /min disagrees with reported"
                        " %.2f /min -- not reported\n",
                        (gated_mean_ms > 0.0) ? (60000.0 / gated_mean_ms) : 0.0,
-                       final_rr);
+                       rrv_rr);
                 ps_ppg->rrv_sd_ms    = RRV_NOT_REPORTABLE;
                 ps_ppg->rrv_rmssd_ms = RRV_NOT_REPORTABLE;
                 ps_ppg->rrv_cv_pct   = RRV_NOT_REPORTABLE;
@@ -1072,17 +1104,99 @@ void    estimate_resp_rate (struct_ppg_analysis *ps_ppg)
            ps_ppg->hrv_sdnn_ms, ps_ppg->hrv_rmssd_ms,
            ps_ppg->hrv_pnn50_pct, ps_ppg->hrv_n);
 
-    if (NULL == fp_rr) { return; }
-    fprintf(fp_rr, "%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%s,%u,%.3f,%.3f,%.3f,%u,"
-                   "%u,%.3f,%.3f,%.3f,%.3f,%u\n",
-            window_duration,
-            rr[INTERPOLATE_AM], rr[INTERPOLATE_BW], rr[INTERPOLATE_FM],
-            qy[INTERPOLATE_AM], qy[INTERPOLATE_BW], qy[INTERPOLATE_FM],
-            td_rr, final_rr, method, n_used, spread,
-            ps_ppg->rrv_sd_ms, ps_ppg->rrv_rmssd_ms, ps_ppg->bbi_cnt,
-            ps_ppg->hr_bpm, ps_ppg->hrv_mean_ms, ps_ppg->hrv_sdnn_ms,
-            ps_ppg->hrv_rmssd_ms, ps_ppg->hrv_pnn50_pct, ps_ppg->hrv_n);
-    fflush(fp_rr);
+    /* FORMATTED ONCE, SENT TO BOTH DESTINATIONS.
+     *
+     * RR_Data.csv is the record; the plot stream is the same row again, tagged
+     * "R," so a live reader can tell it from the per-sample rows.  The two must
+     * carry identical numbers, and the only way to guarantee that is for there
+     * to be one format string rather than two that have to be kept in step by
+     * hand.
+     *
+     * Written even when fp_rr is NULL, which is why this no longer returns
+     * early on it: a read-only output directory must not also silence the live
+     * display. */
+    {
+        char rr_row [512];
+
+        (void)snprintf (rr_row, sizeof(rr_row),
+                "%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%s,%u,%.3f,%.3f,%.3f,%u,"
+                "%u,%.3f,%.3f,%.3f,%.3f,%u",
+                window_duration,
+                rr[INTERPOLATE_AM], rr[INTERPOLATE_BW], rr[INTERPOLATE_FM],
+                qy[INTERPOLATE_AM], qy[INTERPOLATE_BW], qy[INTERPOLATE_FM],
+                td_rr, final_rr, method, n_used, spread,
+                ps_ppg->rrv_sd_ms, ps_ppg->rrv_rmssd_ms, ps_ppg->bbi_cnt,
+                ps_ppg->hr_bpm, ps_ppg->hrv_mean_ms, ps_ppg->hrv_sdnn_ms,
+                ps_ppg->hrv_rmssd_ms, ps_ppg->hrv_pnn50_pct, ps_ppg->hrv_n);
+
+        if (NULL != fp_rr)
+        {
+            fprintf (fp_rr, "%s\n", rr_row);
+            fflush  (fp_rr);
+        }
+        /* The per-window half of the plot stream.  Per-sample rows start with a
+         * digit and carry five fields; this one starts with 'R'.  One character
+         * tells them apart, and the hot path pays nothing for it.
+         *
+         * THIS IS A SUBSET OF THE CSV ROW, NOT A COPY OF IT.  It carries the
+         * values the display shows and no others; the CSV keeps all twenty-one
+         * columns for anything that wants the rest.
+         *
+         *   R, time_s, RR, method, n_used, spread, RRV_SD, RRV_RMSSD,
+         *      RRV_intervals, HR, HRV_meanNN, HRV_SDNN, HRV_RMSSD, HRV_pNN50
+         *
+         * A field on the wire is a field something displays, which is what
+         * keeps the two ends from drifting apart. */
+        if (NULL != fp_data)
+        {
+            /* THREE FIELDS APPENDED, and appended rather than inserted so a
+             * reader written against the shorter row keeps working -- it takes
+             * the fields it knows by position and ignores the rest.
+             *
+             * The two window figures say HOW FAR THROUGH ITS WARM-UP the
+             * respiratory estimator is.  It reports progressively, doubling the
+             * window from RR_PROG_MIN_PTS until it reaches the subject's full
+             * one, and until that happens a display can say how much longer
+             * rather than showing a bare "warming up" and looking stalled.
+             *
+             * HRV_n is the interval count the HRV figures rest on.  It is on
+             * the CSV and was not on the stream, so a display had no way to
+             * show whether SDNN came from twenty intervals or three hundred --
+             * and those are not the same number twice.
+             *
+             * THE THREE SURROGATES, THEIR PROMINENCES, AND THE TWO THRESHOLDS
+             * THEY ARE JUDGED BY.  Without these a display can say a window was
+             * declined but not WHY, which is the difference between telling a
+             * reader the rate is unavailable and telling them nothing.  The
+             * thresholds travel with them because both are per-subject: a
+             * reader that hard-coded the adult values would quietly mis-explain
+             * every neonatal window.  With all eight, the verdict is
+             * reproducible at the far end rather than merely asserted. */
+            {
+                double grid_hz = (double)ps_ppg->sel_fs_hz
+                                 / (double)ps_ppg->sel_rr_decimation;
+
+                fprintf (fp_data,
+                         "R,%.3f,%.3f,%s,%u,%.3f,%.3f,%.3f,%u,%u,"
+                         "%.3f,%.3f,%.3f,%.3f,%.1f,%.1f,%u,"
+                         "%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f\n",
+                         window_duration, final_rr, method, n_used, spread,
+                         ps_ppg->rrv_sd_ms, ps_ppg->rrv_rmssd_ms, ps_ppg->bbi_cnt,
+                         ps_ppg->hr_bpm,
+                         ps_ppg->hrv_mean_ms,  ps_ppg->hrv_sdnn_ms,
+                         ps_ppg->hrv_rmssd_ms, ps_ppg->hrv_pnn50_pct,
+                         (grid_hz > 0.0)
+                             ? ((double)ps_ppg->sel_rr_window_pts  / grid_hz) : 0.0,
+                         (grid_hz > 0.0)
+                             ? ((double)ps_ppg->sel_rr_window_full / grid_hz) : 0.0,
+                         ps_ppg->hrv_n,
+                         rr[INTERPOLATE_AM], rr[INTERPOLATE_BW], rr[INTERPOLATE_FM],
+                         qy[INTERPOLATE_AM], qy[INTERPOLATE_BW], qy[INTERPOLATE_FM],
+                         ps_ppg->sel_agree_bpm, ps_ppg->sel_min_prominence);
+            }
+            (void)fflush (fp_data);
+        }
+    }
     return;
 }
 
@@ -1168,7 +1282,7 @@ static uint32_t sanitize_ibi(struct_ppg_analysis *ps_ppg, uint32_t ibi_ms, int q
                        "          signal has been buffered to tell yet.\n",
                        ibi_ms, (0u < ibi_ms) ? (60000u / ibi_ms) : 0u);
                 /* Run deliberately NOT reset -- it is still valid evidence; only
-                 * the signal's answer is missing.  Resetting costs MAE 7.0 -> 8.3. */
+                 * the signal's answer is missing.  Resetting is measurably worse. */
             }
             else
             {
@@ -1397,9 +1511,9 @@ void    interpolate_vertex (struct_ppg_analysis* ps_ppg, enum_interpolate e_inte
          *     slope = ((v1 - v0) * 100) / beat_period
          * and then an integer step
          *     step  = (slope * sel_rr_decimation) / 100
-         * and ACCUMULATED that step.  Measured over 2755 real beats, the ladder
-         * climbed 42 where the true change was 48 (median), a 14 % per-beat
-         * error, and on 7.7 % of beats the step truncated to ZERO so that
+         * and ACCUMULATED that step.  Across real beats the ladder consistently
+         * undershot the true change by a noticeable margin, and on some beats
+         * the step truncated to ZERO so that
          * beat's modulation was discarded outright.  The ladder also never
          * landed on the next vertex, leaving a discontinuity at every beat that
          * injected broadband noise at the beat rate -- directly into the band
@@ -1426,8 +1540,8 @@ void    interpolate_vertex (struct_ppg_analysis* ps_ppg, enum_interpolate e_inte
              * fiducials, so they do not reach a full window on the same beat --
              * one runs ahead while the others catch up, and the surplus has to
              * be held so that all three can be analysed over the SAME span of
-             * time once the slowest is ready.  Measured headroom in use: peak
-             * 1125 of 2048 grid points on the adult recordings and 561 of 1024
+             * time once the slowest is ready.  In use the peak occupancy sits
+             * just above half the buffer on the adult recordings and on
              * on the neonatal pair.
              *
              * Past capacity the sample cannot be stored, but intp_count must
@@ -1520,16 +1634,17 @@ void    interpolate_vertex (struct_ppg_analysis* ps_ppg, enum_interpolate e_inte
  * Liu 2020 sec 2.3.2: "the point of the maximal slope was selected by
  * calculating the derivative of the detrended PPG signal ... The time intervals
  * between consecutive maximal slope points were calculated."  Onset-to-onset is
- * sometimes quoted as "Liu's definition"; it is not, and measured it moves FM
- * error 2.85 -> 2.81 and fused MAE 0.86 -> 0.83, i.e. noise.
+ * sometimes quoted as "Liu's definition"; it is not, and substituting it moves
+ * neither the FM error nor the fused result beyond noise.
  *
  * Liu additionally detrends each cycle by subtracting the line between its
  * bounding valleys before differentiating.  We do not, and it cannot matter:
  * subtracting a straight line subtracts a CONSTANT from the derivative, so the
  * location of its maximum -- the only thing FM uses -- does not move.
  *
- * FM is nonetheless the weakest of the three surrogates (error exceeds AM and
- * BW on 10 of 12 recordings).  That is because it measures respiratory sinus
+ * FM is nonetheless the weakest of the three surrogates, with a larger error
+ * than AM and BW on nearly every recording.  That is because it measures
+ * respiratory sinus
  * arrhythmia, which is weak in these ICU adults -- all three fiducial choices
  * give the same ~2.8 /min error.  The agreement gate excludes it when it is
  * wrong, which is what keeps the fused output correct.
@@ -1686,6 +1801,32 @@ void    ppg_on_peak (void *user, uint32_t peak_index, int32_t peak_value)
                                   ((0u < ibi_samples) ? ibi_samples : 1u));
         ps_ppg->hr_bpm = cur_hr;
 
+        /* HEART RATE ON THE PLOT STREAM, THE MOMENT IT IS KNOWN.
+         *
+         * The per-window row carries HR too, but it does not exist until the
+         * respiratory estimator makes its first report -- measured at 16.8 s on
+         * bidmc_04, where the second beat, and so the first heart rate, was
+         * available at 1.4 s.  A display fed only by that row shows nothing for
+         * fifteen seconds while the beats it is drawing march past, which is
+         * not what a monitor does with its primary vital.
+         *
+         * So a beat emits its own row.  A THIRD row shape, told apart by its
+         * first character exactly as the other two are: a digit begins a sample,
+         * 'R' a window, 'H' a beat.  It carries the time and the rate and
+         * nothing else -- the variability figures genuinely need history and
+         * stay on the window row, where HRV_n says how much they rest on.
+         *
+         * This is one line per beat, around 1.5 a second, against 125 sample
+         * rows in the same period.  It costs the hot path nothing because it is
+         * not on it. */
+        if (NULL != fp_data)
+        {
+            fprintf (fp_data, "H,%.3f,%u\n",
+                     (double)peak_index / (double)ps_ppg->sel_fs_hz,
+                     (unsigned)ps_ppg->hr_bpm);
+            (void)fflush (fp_data);
+        }
+
         /* ---- HRV: NORMAL-TO-NORMAL series -------------------------------
          * A repaired interval must not enter the series (substitution injects
          * artificial regularity), and a beat that is excluded breaks adjacency
@@ -1801,12 +1942,16 @@ void    ppg_analysis_init (struct_ppg_analysis *ps_ppg,
     }
     ps_ppg->sel_rr_window_full    = ps_band->window_pts;
     ps_ppg->sel_rr_welch_seg_full = ps_band->welch_seg;
+    ps_ppg->sel_psd_accum_n       = ps_band->psd_accum_n;
+    ps_ppg->sel_agree_bpm         = ps_band->agree_bpm;
+    ps_ppg->sel_prog_min_pts      = ps_band->prog_min_pts;
+    ps_ppg->sel_min_prominence    = ps_band->min_prominence;
     ps_ppg->sel_rr_slide_pts      = ps_band->slide_pts;
     /* The ACTIVE window starts small and grows -- see RR_PROG_MIN_PTS. */
-    ps_ppg->sel_rr_window_pts     = RR_PROG_MIN_PTS;
-    ps_ppg->sel_rr_welch_seg      = RR_PROG_MIN_PTS;
+    ps_ppg->sel_rr_window_pts     = ps_band->prog_min_pts;
+    ps_ppg->sel_rr_welch_seg      = ps_band->prog_min_pts;
     ps_ppg->rr_warmup_done        = 0u;
-    ps_ppg->rr_next_report_pts    = RR_PROG_MIN_PTS;
+    ps_ppg->rr_next_report_pts    = ps_band->prog_min_pts;
     ps_ppg->rr_track_rr           = -1.0;
     ps_ppg->rr_track_p            = RR_TRACK_P0;
     ps_ppg->rr_track_count        = 0;

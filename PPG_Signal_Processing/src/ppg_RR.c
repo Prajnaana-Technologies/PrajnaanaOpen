@@ -373,19 +373,12 @@ double estimate_rr_peak_bin (const double *psd, int k_lo, int k_hi, double *p_qu
      * receives drift at almost full gain.  No filter removes that -- any filter
      * passes 1.2x its own corner -- so the background is removed here instead.
      *
-     * The scale of the problem this addresses -- these
-     * are the numbers that MOTIVATED it, not a description of the current
-     * build.  Power in the LOWEST in-band bin relative to power at the TRUE
-     * respiratory bin, across an annotated adult reference set:
-     *
-     *      cleanest recording   0.09     drift-heavy recording   0.88
-     *      typical recording    0.23     worst recording         1.09
-     *
-     * i.e. on the worst the band floor held MORE power than the real
-     * respiratory peak, in half of all windows.  After whitening and the longer
-     * segment the same ratio falls to 0.14 and 0.19 on those two, and the
-     * fraction of windows where the floor outguns the peak drops from 50 % to
-     * 16 %.
+     * The scale of the problem this addresses: on a drift-heavy recording the
+     * lowest in-band bin could hold MORE power than the true respiratory peak,
+     * in as many as half its windows, so the peak search returned the band
+     * floor rather than the breath.  Whitening and the longer segment together
+     * leave the floor well below the peak on those same recordings.  The
+     * figures are in docs/DESIGN.md.
      *
      * The background is fitted as a straight line in log-power against
      * log-frequency -- the standard 1/f^b form -- and divided out.  Bin index
@@ -418,10 +411,10 @@ double estimate_rr_peak_bin (const double *psd, int k_lo, int k_hi, double *p_qu
          * usable here.  The lowest in-band bin is not "background" at all --
          * it is a spurious drift peak -- and including it in a least-squares
          * fit drags the slope steeper, which then over-corrects the mid-low
-         * bins and manufactures a NEW failure: measured with the band floor at
-         * 4/min, windows that read the rate correctly jumped to exactly half
-         * of it, because the over-steep background inflated the whitened
-         * mid-band where the half-rate bin sits.
+         * bins and manufactures a NEW failure: windows that read the rate
+         * correctly jump to exactly half of it, because the over-steep
+         * background inflates the whitened mid-band where the half-rate bin
+         * sits.
          * A median-based fit ignores that one bin instead of being led by it. */
         for (ii = 0; ii < n; ii++)
         {
@@ -585,9 +578,10 @@ uint32_t extract_breath_intervals (const double *x, int n, double fs,
  * of ~2T and a spurious crossing splits one into ~T/2, and BOTH survive the band
  * test.  The interval series then becomes multi-modal, and SD / RMSSD -- which
  * are simply the spread of that series -- measure the detector's miss and split
- * rate rather than the subject's respiratory variability.  Measured on the adult
- * cohort: 19 % of accepted intervals sit outside 0.75-1.35 x the reported
- * period, and they inflate median SD to 3.3 x the manually annotated value.
+ * rate rather than the subject's respiratory variability.  A noticeable share
+ * of accepted intervals sit well away from the reported period, and they
+ * inflate the reported spread several times above the manually annotated
+ * value.
  *
  * WHY THIS BOUND.  The tolerance is sqrt(2), which is DERIVED rather than swept:
  * on a logarithmic period axis it is the exact midpoint between the fundamental

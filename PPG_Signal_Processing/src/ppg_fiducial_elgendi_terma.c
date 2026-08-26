@@ -11,7 +11,8 @@
  *
  * One of two implementations of the ppg_fiducial.h contract.  Both are linked;
  * the dispatcher picks between them per recording.  This one is the better
- * choice for ADULTS -- F1 98.7 against IMS's 96.6 on the annotated cohort.
+ * choice for ADULTS, scoring better than IMS on the annotated recordings; see
+ * docs/RESULTS.md.
  *
  * SOURCE
  *   Elgendi M, Norton I, Brearley M, Abbott D, Schuurmans D, "Systolic Peak
@@ -108,8 +109,12 @@ static  terma_biquad tm_hp, tm_lp;    /* causal 2nd-order Butterworth HP + LP  *
 static  terma_state  tm_hp_s, tm_lp_s;
 
 static  double      tm_q     [TERMA_HIST];   /* squared clipped signal        */
-static  int32_t     tm_raw   [TERMA_HIST];   /* stream as handed to us        */
-static  uint32_t    tm_wr;
+static  int32_t     tm_smooth[TERMA_HIST];   /* the SMOOTHED stream -- what is
+                                             * detected on and what every
+                                             * reported amplitude comes from  */
+static  uint32_t    tm_wr;                   /* index of the CENTRED sample   */
+static  uint32_t    tm_n;                    /* samples fed; tm_wr trails it by
+                                              * the smoothing half-width       */
 
 static  double      tm_sum_w1;               /* running window sums           */
 static  double      tm_sum_w2;
@@ -122,7 +127,6 @@ static  void       *tm_user;
 
 static  uint32_t    tm_in_block;             /* inside a block of interest?   */
 static  uint32_t    tm_block_start;
-static  uint32_t    tm_prev_peak_index;      /* previous emitted peak         */
 static  uint32_t    tm_prev_steep_index;     /* upslope of the preceding cycle */
 static  uint32_t    tm_prev_steep_valid;
 
@@ -183,15 +187,15 @@ static uint32_t tm_odd_window (uint32_t ms, uint32_t fs)
 }
 
 /**
- * @brief Emit a beat: locate the foot before the peak, then call the interface.
+ * @brief Emit a beat: locate the onset of this pulse, then call the interface.
  *
- * Elgendi reports systolic peaks only, so the onset is recovered as the minimum
- * of the retained stream between the previous peak and this one -- the standard
- * definition of the pulse foot, and the value the BW surrogate needs.
+ * [ELGENDI] reports systolic peaks only.  The onset the interface also requires
+ * is recovered here, from this pulse's own rising edge.
  */
-static void tm_emit_peak (uint32_t peak_index)
+static void tm_emit_peak (struct_fiducial *ps_fd, uint32_t peak_index)
 {
-    uint32_t search_from;
+    uint32_t floor_at;
+    uint32_t crest_at;
     uint32_t foot_index;
     int32_t  foot_value;
     uint32_t i;
@@ -199,51 +203,94 @@ static void tm_emit_peak (uint32_t peak_index)
     uint32_t steep_index;
 
     if (peak_index >= tm_wr) { return; }
+    if (0u == peak_index)    { return; }
 
-    /* Look back at most one W2 -- a beat -- for the preceding minimum. */
-    search_from = (0u < tm_prev_peak_index) ? (tm_prev_peak_index + 1u)
-                                            : ((peak_index > tm_w2) ? (peak_index - tm_w2) : 0u);
-    if (search_from >= peak_index) { return; }
-    if ((peak_index - search_from) > tm_w2) { search_from = peak_index - tm_w2; }
+    /* THE ONSET IS A PROPERTY OF THE UPSTROKE, NOT OF THE PREVIOUS BEAT.
+     *
+     * The onset is where this pulse started rising, so it is found by walking
+     * back down the rise from the peak until the stream stops falling.  That
+     * asks nothing about the beat before: any starting point on this pulse
+     * arrives at the same sample.
+     *
+     * Taking instead the lowest sample between the previous peak and this one
+     * ties the onset to a window whose far edge is another fiducial, so moving
+     * the peak drags the window and a different low point wins -- correcting
+     * the peak alone was enough to relocate a quarter of the onsets on a
+     * waveform where no onset had moved at all.
+     *
+     * One beat still bounds the walk.  Nothing physiological rises for that
+     * long, so reaching it means the trace is not a pulse; stopping there keeps
+     * the reach back finite, so a caller displaying the marks knows how long to
+     * wait before a sample's marks can no longer change. */
+    floor_at   = (peak_index > tm_w2) ? (peak_index - tm_w2) : 0u;
 
-    foot_index = search_from;
-    foot_value = tm_raw[search_from % TERMA_HIST];
-    for (i = search_from; i < peak_index; i++)
+    /* The declared peak is the strongest point of the DETECTION copy, which
+     * carries that stage's own delay, so it can sit a sample or two down the
+     * far side of the crest.  Climb to the crest first, then descend. */
+    crest_at = peak_index;
+    while ((crest_at > floor_at) &&
+           (tm_smooth[(crest_at - 1u) % TERMA_HIST] >= tm_smooth[crest_at % TERMA_HIST]))
     {
-        int32_t v = tm_raw[i % TERMA_HIST];
-
-        if (v < foot_value) { foot_value = v; foot_index = i; }
+        crest_at--;
     }
+
+    /* Lowest sample in the beat that ends at that crest.  A single minimum over
+     * a whole beat rather than a walk down the rise, because a rise is not
+     * perfectly monotonic and a walk halts at the first wobble -- measured, a
+     * quarter of the onsets stopped up to 14 samples short of the trough. */
+    foot_index = crest_at;
+    foot_value = tm_smooth[crest_at % TERMA_HIST];
+    for (i = crest_at; i > floor_at; i--)
+    {
+        int32_t v = tm_smooth[(i - 1u) % TERMA_HIST];
+
+        if (v <= foot_value) { foot_value = v; foot_index = i - 1u; }
+    }
+    if (foot_index >= peak_index) { return; }
 
     /* Steepest single-sample rise between foot and peak: the FM fiducial. */
     steep_rise = 0; steep_index = foot_index;
     for (i = foot_index + 1u; i <= peak_index; i++)
     {
-        int32_t rise = tm_raw[i % TERMA_HIST] - tm_raw[(i - 1u) % TERMA_HIST];
+        int32_t rise = tm_smooth[i % TERMA_HIST] - tm_smooth[(i - 1u) % TERMA_HIST];
 
         if (rise > steep_rise) { steep_rise = rise; steep_index = i; }
     }
 
-    /* Put the indices back on the RAW sample time base: the smoothing stage is
-     * causal, so everything found on its output is late by its group delay.
-     * See smooth_group_delay() in chebyshev_t2_o4.c. */
-    {
-        uint32_t gd = smooth_group_delay();
-
-        foot_index  = (foot_index  > gd) ? (foot_index  - gd) : 0u;
-        peak_index  = (peak_index  > gd) ? (peak_index  - gd) : 0u;
-        steep_index = (steep_index > gd) ? (steep_index - gd) : 0u;
-    }
+    /* No time-base correction here.  The smoothed stream is stored at the sample
+     * each average describes, so every index found on it is already where it
+     * belongs.  See the block comment beside struct_movavg in ppg_common.h. */
 
     ppg_on_foot (tm_user, foot_index, foot_value,
                  tm_prev_steep_index, tm_prev_steep_valid);
-    ppg_on_peak (tm_user, peak_index, tm_raw[peak_index % TERMA_HIST]);
+
+    /* AMPLITUDE SAMPLING POINT, PRESERVED DELIBERATELY.
+     *
+     * The declared peak is the strongest point of the DETECTION copy, which
+     * carries that stage's own delay, so it sits a little down the far side of
+     * the crest.  Sampling the amplitude one smoothing half-width back lands it
+     * nearer the true crest, and that -- not the index -- is what the AM
+     * surrogate is built from.  Keeping this point unchanged is what makes the
+     * move to mid-point storage inert -- it is a sample on the pulse, not a
+     * time-base correction, and the two must not be conflated. */
+    {
+        uint32_t gd      = smooth_group_delay();
+        uint32_t amp_at  = (peak_index > gd) ? (peak_index - gd) : 0u;
+
+        ppg_on_peak (tm_user, peak_index, tm_smooth[amp_at % TERMA_HIST]);
+    }
 
     tm_prev_steep_index = steep_index;
     tm_prev_steep_valid = 1u;
-    tm_prev_peak_index  = peak_index;
+
+    /* Update the flags related to peak and foot */
+    ps_fd->s_data_buf [peak_index % PPG_RING_LEN].it_is_peak = 1;
+    ps_fd->s_data_buf [foot_index % PPG_RING_LEN].it_is_foot = 1;
+    ps_fd->peak_count++;
+    ps_fd->foot_count++;
     return;
 }
+
 
 /**
  * @brief Scale Elgendi's one-beat window W2 to a subject's heart rate.
@@ -263,8 +310,8 @@ static void tm_emit_peak (uint32_t peak_index)
  * track: adjacent blocks of interest merge, and a merged block yields ONE peak
  * where there were two.  The failure is silent -- the interval sanitiser
  * divides the doubled intervals, so the reported RATE survives and only the
- * beat COUNT reveals it.  Measured at a mean beat interval of 411 ms, the
- * unscaled detector found 68-77 % of the beats present.
+ * beat COUNT reveals it.  At neonatal beat intervals the unscaled detector
+ * misses a substantial fraction of the beats present.
  *
  * HOW.  There is exactly one published datum, so it is preserved and carried:
  * W2 keeps the same position inside the subject's beat-duration range that
@@ -342,10 +389,10 @@ void    terma_fiducial_init (struct_fiducial *ps_fd,
     tm_w2   = tm_odd_window (w2_ms, tm_rate);
 
     memset(tm_q, 0x00, sizeof(tm_q));
-    memset(tm_raw, 0x00, sizeof(tm_raw));
-    tm_wr = 0u; tm_sum_w1 = 0.0; tm_sum_w2 = 0.0; tm_sum_all = 0.0; tm_n_all = 0u;
+    memset(tm_smooth, 0x00, sizeof(tm_smooth));
+    tm_wr = 0u; tm_n = 0u; tm_sum_w1 = 0.0; tm_sum_w2 = 0.0; tm_sum_all = 0.0; tm_n_all = 0u;
     tm_in_block = 0u; tm_block_start = 0u;
-    tm_prev_peak_index = 0u; tm_prev_steep_index = 0u; tm_prev_steep_valid = 0u;
+    tm_prev_steep_index = 0u; tm_prev_steep_valid = 0u;
     memset(&tm_hp_s, 0x00, sizeof(tm_hp_s));
     memset(&tm_lp_s, 0x00, sizeof(tm_lp_s));
 
@@ -363,6 +410,7 @@ void    terma_fiducial_init (struct_fiducial *ps_fd,
            "for the paper's zero-phase filter and whole-record mean\n\n");
 
     init_chebyshev_filter(fs_hz);
+
     return;
 }
 
@@ -379,20 +427,47 @@ void    terma_fiducial_process_sample (struct_fiducial *ps_fd, int32_t sample_va
     double   clipped;
     double   qv;
     uint32_t centre;
-    uint32_t half2 = (tm_w2 - 1u) / 2u;
+    uint32_t half1 = (tm_w1 - 1u) / 2u;
 
-    /* Stream as handed to us: retains baseline wander, and is what the
-     * reported amplitudes are sampled from.  The two stages are kept apart so
-     * the trace can show each one: `band` is the band-pass output alone, `kept`
-     * is that same sample after the moving average.  Only `kept` is used for
-     * detection -- the split exists so the CSV columns mean what they say. */
+    /* THREE STREAMS, AND ONLY ONE OF THEM IS EVER COMPUTED WITH.
+     *
+     * `sample_value` is the input as read; `band_only` is it after the
+     * band-pass alone; `kept` is that same sample after the moving average.
+     * Detection, the crest and onset searches, and every reported amplitude
+     * read `kept` and nothing else -- once a sample has been smoothed the
+     * earlier forms are never referred to again, because a fiducial located on
+     * one stream cannot be measured on another.
+     *
+     * The first two are kept only so the trace can show each stage, which is
+     * why the CSV columns mean what they say. */
+    uint32_t gd        = smooth_group_delay();
     int32_t  band_only = (int32_t)(filter_int_sample(sample_value) + PPG_FILTER_DC_PEDESTAL);
     int32_t  kept      = smooth_int_sample(band_only);
 
-    tm_raw[tm_wr % TERMA_HIST] = kept;
-    ps_fd->s_data_buf[tm_wr % PPG_RING_LEN].input_sample     = sample_value;
-    ps_fd->s_data_buf[tm_wr % PPG_RING_LEN].filtered_sample  = band_only;
-    ps_fd->s_data_buf[tm_wr % PPG_RING_LEN].smoothed_sample  = kept;
+    /* The input and band-pass COLUMNS describe the sample that has just
+     * arrived, so they go in at its own index.  The smoothed column is filled in
+     * below, at the index the average actually describes; until then the
+     * band-passed value stands in, so a row never holds stale ring content. */
+    ps_fd->s_data_buf[tm_n % PPG_RING_LEN].input_sample     = sample_value;
+    ps_fd->s_data_buf[tm_n % PPG_RING_LEN].filtered_sample  = band_only;
+    ps_fd->s_data_buf[tm_n % PPG_RING_LEN].smoothed_sample  = band_only;
+    ps_fd->s_data_buf[tm_n % PPG_RING_LEN].it_is_peak       = 0;
+    ps_fd->s_data_buf[tm_n % PPG_RING_LEN].it_is_foot       = 0;
+    tm_n++;
+    ps_fd->ring_wr_pos = tm_n;
+
+    /* MID-POINT.  A moving average describes the middle of its own window, so
+     * `kept` is the average about the sample one half-width back, and that is
+     * the index it is stored at.  Everything found on this stream is then on
+     * the true time base and nothing has to be corrected afterwards.  Until
+     * `tm_n` has passed the half-width there is no such sample to store it at. */
+    if (tm_n <= gd)
+    {
+        return;
+    }
+
+    tm_smooth[tm_wr % TERMA_HIST] = kept;
+    ps_fd->s_data_buf[tm_wr % PPG_RING_LEN].smoothed_sample = kept;
 
     /* Detection copy: the paper's own 0.5-8 Hz band, applied causally. */
     band    = tm_run (&tm_lp, &tm_lp_s, tm_run (&tm_hp, &tm_hp_s, (double)kept));
@@ -408,8 +483,28 @@ void    terma_fiducial_process_sample (struct_fiducial *ps_fd, int32_t sample_va
 
     if (tm_wr < tm_w2) { return; }
 
-    /* The centred averages are defined at the sample half a W2 back. */
-    centre = tm_wr - 1u - half2;
+    /* WHICH SAMPLE THE BLOCK BOUNDARY BELONGS TO.
+     *
+     * A moving average describes the middle of its own window, and the two
+     * averages here have different windows.  What crosses the threshold, and so
+     * what opens and closes a block of interest, is MA_peak -- the W1 average,
+     * whose running sum ends at the newest sample and is therefore centred half
+     * a W1 back.  That, and not half a W2 back, is the sample the crossing is
+     * about.
+     *
+     * The distance between the two is (W2 - W1) / 2, which at an adult 125 Hz
+     * is 34 samples.  Recording a boundary at the W2 centre would place the
+     * block a third of a beat before the pulse that raised it, and the search
+     * below -- Elgendi's "maximum within the block of interest" -- would then be
+     * looking at signal the pulse has not reached, so it would return a window
+     * edge rather than a peak.
+     *
+     * MA_beat is left where its own window puts it, half a W2 back.  It is the
+     * one-beat baseline the threshold rides on and it moves slowly, so reading
+     * it from slightly earlier costs nothing measurable; re-centring it on the
+     * W1 axis instead would mean waiting half a W2 for samples the decision
+     * does not need, and was measured to place every fiducial identically. */
+    centre = tm_wr - 1u - half1;
 
     {
         double ma_peak = tm_sum_w1 / (double)tm_w1;
@@ -441,11 +536,10 @@ void    terma_fiducial_process_sample (struct_fiducial *ps_fd, int32_t sample_va
                         bestv = tm_q[i % TERMA_HIST]; best = i;
                     }
                 }
-                tm_emit_peak (best);
+                tm_emit_peak (ps_fd, best);
             }
         }
     }
-    ps_fd->ring_wr_pos = tm_wr;
     return;
 }
 

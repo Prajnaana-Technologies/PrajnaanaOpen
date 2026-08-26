@@ -58,6 +58,9 @@
 CC      ?= cc
 SRCDIR   = src
 INCDIR   = include
+# The Python front end. Not compiled by anything here -- named so the `plot`
+# target below has one place to find it.
+MONDIR   = Monitor
 CSTD     = -std=c99
 WARN     = -Wall -Wextra -Wpedantic
 OPT     ?= -O2
@@ -114,7 +117,36 @@ HDR      = $(INCDIR)/ppg_common.h $(INCDIR)/ppg_fiducial.h $(INCDIR)/filter_band
 # validation is re-run.
 # ---------------------------------------------------------------------------
 
-.PHONY: all strict asan debug clean help
+.PHONY: all strict asan debug clean help plot
+
+# `all` is the default goal, whatever order the targets appear in below.
+# Without this, the first target in the file would take that role.
+.DEFAULT_GOAL := all
+
+# ---------------------------------------------------------------------------
+# plot -- BUILD AND WATCH IT RUN, in one command.
+#
+#     make plot REC=path/to/recording.txt
+#     make plot REC=rec.txt ARGS="-s neonate --turbo"
+#
+# Builds first, then hands the binary to Monitor/python_plot/ppg_plot.py, which
+# opens the live trace and streams into it.  Needs PySide6 and pyqtgraph.
+#
+# REC is required rather than defaulted: a default recording that quietly
+# analysed the wrong file would be worse than an error message.  Everything in
+# ARGS is passed through to the reader, whose own -h lists it.
+#
+# The reader can also be run on its own and will build if it has to, so this
+# target is a convenience rather than the only way in.
+# ---------------------------------------------------------------------------
+PYTHON ?= python
+
+plot: $(BIN)
+ifndef REC
+	@echo "make plot needs a recording:  make plot REC=path/to/recording.txt"
+	@exit 1
+endif
+	$(PYTHON) $(MONDIR)/python_plot/ppg_plot.py -i "$(REC)" --exe ./$(BIN) $(ARGS)
 
 # ---------------------------------------------------------------------------
 # all -- THE DEFAULT.  `make` with no argument runs this and it is the only

@@ -94,6 +94,33 @@ per-beat record, because the analysis layer is streaming and wants each fiducial
 as it is found: the foot closes a cycle (BW + FM), the peak opens one (AM + HR).
 `user` is the opaque analysis context handed to `fiducial_init()`.
 
+**A detector also counts the marks it places**, in `peak_count` and
+`foot_count` on the context. Anything displaying or logging the marked stream
+needs those, for two reasons.
+
+The first is knowing when to begin. A detector recognises a beat from the signal
+that FOLLOWS it, so it marks samples that have already gone past: a sample is
+not decided when it arrives, and a row written then would say "not a peak" about
+one the detector is about to mark. A caller therefore lets the detector get
+ahead before it starts, and both counts reaching a small number of beats is the
+signal that it has. `ppg_main.c` waits for `TRACE_START_BEATS` and then runs one
+sample in, one row out.
+
+How many beats is measured rather than derived: across the validation corpus the
+shipped value loses no mark, and a smaller one does. See
+[`RESULTS.md`](RESULTS.md).
+
+The second is checking afterwards. The counts say how many marks were PLACED; a
+trace says how many arrived. Comparing them catches a caller that started too
+early. They are not always equal for a benign reason -- two consecutive beats can
+resolve their onset to the same sample, and that sample is marked twice -- so a
+small excess means a shared onset, and a large one means marks were missed.
+
+**This is now implemented** — see `ppg_fiducial.h`. Two callbacks rather than one
+per-beat record, because the analysis layer is streaming and wants each fiducial
+as it is found: the foot closes a cycle (BW + FM), the peak opens one (AM + HR).
+`user` is the opaque analysis context handed to `fiducial_init()`.
+
 ---
 
 ## 3. Conventions the detector must honour

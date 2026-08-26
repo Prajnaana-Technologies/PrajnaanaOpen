@@ -18,9 +18,9 @@ correct in another.
 | respiratory rate, settled windows | **MAE 0.42 /min** |
 | within 2 /min | **99 %** |
 | sub-harmonic reports | **0 %** |
-| beat detection F1 (median / worst) | **98.7 / 92.0** |
-| window coverage | **90 %** |
-| first RR report | **median 25.9 s of signal** |
+| beat detection F1 (median / worst) | **99.0 / 94.1** |
+| window coverage | **83 %** |
+| first RR report | **median 25.4 s of signal** |
 
 Settled rows only; provisional rows (`_PROV`) are scored separately below.
 
@@ -70,39 +70,48 @@ reportable rows.
 
 | rec | ref RR | beats | Se % | PPV % | F1 | HR | 1st rpt | cover | RR MAE¹ | bias¹ | ≤2 /min¹ | RRV RMSSD | HRV SDNN | HRV RMSSD |
 |:---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| bidmc_01 | 21.3 | 713 | 96.6 | 99.2 | 97.9 | 91 | 25.0 | 77 % | 0.21 | −0.08 | 100 % | 588 | 22.3 | 31.5 |
-| bidmc_02 | 15.3 | 720 | 97.9 | 99.3 | 98.6 | 90 | **34.8** | 88 % | 0.45 | −0.12 | 100 % | 1075 | 46.2 | 74.8 |
-| bidmc_03 | 17.7 | 597 | 91.4 | 94.0 | 92.7 | 76 | 34.7 | 96 % | 0.35 | +0.32 | 100 % | 791 | 19.4 | 27.2 |
-| bidmc_04 | 16.6 | 695 | 89.2 | 95.0 | 92.0 | 93 | 25.4 | 98 % | 0.32 | −0.14 | 100 % | 695 | 15.5 | 20.9 |
-| **bidmc_05** | **6.0** | 761 | 95.9 | 98.9 | 97.4 | 97 | 82.8 | **67 %** | **1.02** | +0.53 | **95 %** | 1355 | 17.5 | 26.5 |
-| bidmc_06 | 20.1 | 653 | 99.4 | 99.8 | 99.6 | 81 | 25.9 | 98 % | 0.17 | +0.06 | 100 % | 455 | 9.0 | 13.0 |
-| bidmc_07 | 20.0 | 720 | 99.7 | 100.0 | 99.9 | 90 | 26.0 | 96 % | 0.08 | +0.08 | 100 % | 711 | 5.8 | 8.6 |
-| bidmc_08 | 21.2 | 794 | 99.5 | 100.0 | 99.7 | 100 | 41.9 | 88 % | 0.32 | +0.12 | 100 % | 714 | 6.4 | 8.5 |
-| bidmc_09 | 20.1 | 609 | 98.4 | 99.3 | 98.9 | 76 | 25.8 | 81 % | 0.19 | +0.00 | 100 % | 855 | 5.9 | 7.7 |
-| bidmc_10 | 18.7 | 640 | 93.9 | 96.7 | 95.3 | 81 | **18.1** | 100 % | 0.69 | −0.44 | 92 % | 761 | 75.0 | 40.8 |
-| bidmc_11 | 14.8 | 738 | 98.9 | 99.9 | 99.4 | 91 | 25.7 | 98 % | 0.85 | +0.30 | 98 % | 887 | 34.3 | 29.0 |
-| bidmc_12 | 18.9 | 738 | 98.7 | 99.7 | 99.2 | 91 | 25.9 | 98 % | 0.42 | +0.19 | 100 % | 700 | 33.3 | 16.4 |
+| bidmc_01 | 21.3 | 713 | 97.0 | 99.6 | 98.3 | 91 | 25.3 | 68 % | 0.39 | −0.21 | 97 % | 549 | 14.0 | 18.5 |
+| bidmc_02 | 15.3 | 720 | 98.6 | 100.0 | 99.3 | 90 | **74.6** | 88 % | 0.45 | +0.12 | 100 % | 1006 | 14.3 | 20.4 |
+| bidmc_03 | 17.7 | 597 | 94.3 | 97.0 | 95.6 | 76 | 17.6 | 95 % | 0.35 | +0.35 | 100 % | 817 | 9.0 | 9.5 |
+| bidmc_04 | 16.6 | 695 | 91.2 | 97.1 | 94.1 | 93 | 25.2 | 93 % | 0.35 | −0.13 | 100 % | 811 | 20.8 | 12.1 |
+| **bidmc_05** | **6.0** | 761 | 96.7 | 99.7 | 98.2 | 98 | **139.7** | **9 %** | **7.00** | +7.00 | **0 %** | 1428 | 10.2 | 13.3 |
+| bidmc_06 | 20.1 | 653 | 99.5 | 100.0 | 99.8 | 81 | 34.2 | 93 % | 0.16 | +0.05 | 100 % | 419 | 7.6 | 8.3 |
+| bidmc_07 | 20.0 | 720 | 99.7 | 100.0 | 99.9 | 90 | **17.7** | 98 % | 0.08 | +0.08 | 100 % | 766 | 5.7 | 8.4 |
+| bidmc_08 | 21.2 | 794 | 99.5 | 100.0 | 99.7 | 100 | 25.5 | 86 % | 0.29 | −0.03 | 100 % | 711 | 7.0 | 11.1 |
+| bidmc_09 | 20.1 | 609 | 98.4 | 99.3 | 98.9 | 76 | 17.6 | 82 % | 0.19 | −0.01 | 100 % | 864 | 7.0 | 6.9 |
+| bidmc_10 | 18.7 | 640 | 96.2 | 99.1 | 97.6 | 81 | 18.2 | 91 % | 0.46 | −0.21 | 98 % | 662 | 61.0 | 53.2 |
+| bidmc_11 | 14.8 | 738 | 99.1 | 100.0 | 99.5 | 91 | 34.7 | 96 % | 0.78 | +0.20 | 100 % | 757 | 21.1 | 15.8 |
+| bidmc_12 | 18.9 | 738 | 98.7 | 99.7 | 99.2 | 91 | 25.5 | 96 % | 0.41 | +0.20 | 100 % | 462 | 12.2 | 12.9 |
 
 ¹ settled rows only — see the note above the table. Every column here is
 produced by the validation procedure described in
 [`../README.md`](../README.md), "Reproducing the measured figures", so this
 table is regenerated rather than transcribed.
 
-**Beat detection** — median Se **98.2 %**, PPV **99.3 %**, F1 **98.7**, worst 92.0.
+**Beat detection** — median Se **98.5 %**, PPV **99.7 %**, F1 **99.0**, worst 94.1.
 
-**First RR report** — median **25.9 s**, range 18.1–82.8 s.
+**First RR report** — median **25.4 s**, range 17.6–139.7 s.
 
-**Coverage 90 %** — 619 of 684 rows carry a rate; the rest are `DECLINED` by the
+**Coverage 83 %** — 568 of 684 rows carry a rate; the rest are `DECLINED` by the
 quality gate or `REJECTED` for want of a credible peak.
 
 | | n | MAE | bias | within-2 |
 |:---|---:|---:|---:|---:|
-| **settled rows** | 570 | **0.42** | +0.06 | **99 %** |
-| provisional (warm-up, `_PROV`) | 49 | 1.42 | −0.44 | 80 % |
-| all reported | 619 | 0.50 | +0.02 | 97 % |
+| **settled rows** | 531 | **0.42** | +0.11 | **99 %** |
+| provisional (warm-up, `_PROV`) | 37 | 1.19 | +0.13 | 84 % |
+| all reported | 568 | 0.47 | +0.11 | 98 % |
 
-Ten of twelve recordings reach **100 % within-2**, eight are below 0.5 MAE, and
-the slow-breathing record now reaches **95 %** where it was 61 %.
+Nine of twelve recordings reach **100 % within-2** and nine are below 0.5 MAE.
+
+**The slow-breathing recording is the cohort's open failure.** bidmc_05 breathes
+at 6.0 /min, the only recording anywhere near the bottom of the adult band, and
+it now reports a rate on **9 %** of its windows against 67 % previously, with the
+few it does report reading high. Two surrogates have to concur before a window
+is reported, and at this rate they no longer do. The aggregate above conceals
+this, because a recording that reports almost nothing contributes almost nothing
+to it: read the per-record table, not the total, before concluding that slow
+breathing is handled. Nothing in the cohort corroborates a fix for it either,
+since there is exactly one such recording.
 
 ### Setting these beside the literature — and why they are not comparable
 
@@ -111,7 +120,7 @@ MAE, so the same rows are given both ways:
 
 | | 95 % limits of agreement | bias |
 |:---|:---|---:|
-| **this implementation**, all reported rows | **−1.9 to +1.9 /min** | +0.0 |
+| **this implementation**, all reported rows | **−1.9 to +2.1 /min** | +0.1 |
 | best of 314 algorithms on PPG, [CHARLTON] | −5.1 to +7.2 /min | +1.0 |
 | best on ECG, [CHARLTON] | −4.7 to +4.7 /min | 0.0 |
 | impedance pneumography — the clinical standard, [CHARLTON] | −5.6 to +5.2 /min | −0.2 |
@@ -158,14 +167,14 @@ zero-crossing timing. It is not comparable with a published norm.
 **bidmc_05, the slow breather, is the record every change has been measured
 against.** It now reports 67 % of its windows at MAE 1.02 and 95 % within-2,
 against 32 % / 2.93 / 61 % before the harmonic guard. Its first report is still
-82.8 s. Part of that is physics — 16–33 s of data cannot contain a 6 /min rate
-at any FFT length — and part is that its surrogates lock onto three different
-harmonics, so they never corroborate one another. See [`DESIGN.md`](DESIGN.md), "Why the slow
-breather still waits 82.8 s".
+139.7 s, and beyond that it mostly reports nothing at all. Part of that is
+physics — 16–33 s of data cannot contain a 6 /min rate at any FFT length — and
+part is that its surrogates lock onto three different harmonics, so they never
+corroborate one another. See [`DESIGN.md`](DESIGN.md), "Why the slow breather
+waits longest, and now mostly says nothing".
 
-**bidmc_02 reports at 34.8 s, and that is a design choice rather than physics.**
-Anchoring the fusion on a band-edge peak would delay it to 69.1 s — slower than
-the analysis window itself. See [`DESIGN.md`](DESIGN.md), "The anchor must not be
+**bidmc_02 reports at 74.6 s, and that is a design choice rather than physics.**
+Anchoring the fusion on a band-edge peak delays it further still. See [`DESIGN.md`](DESIGN.md), "The anchor must not be
 a band-edge peak".
 
 ## Neonatal — 2 recordings, `-s neonate -nu 1`
@@ -179,20 +188,30 @@ Run with `-s neonate`, which dispatches to **Karlen IMS** — see
 | beats detected / median HR | 2877 / **150 bpm** | 2758 / **144 bpm** |
 | beats implied by the PPG's own cardiac spectrum | 3012 | 2862 |
 | **detection rate** | **96 %** | **96 %** |
-| RR coverage | 73 / 144 (51 %) | 71 / 140 (51 %) |
-| RR median / IQR / range | 43.44 / 1.23 / 36.5–45.9 | 44.12 / 3.12 / 36.2–52.0 |
-| RRV reportable | 71 / 144 | 69 / 140 |
-| RRV RMSSD (median) | 358 ms | 309 ms |
+| RR coverage | 69 / 144 (48 %) | 60 / 140 (43 %) |
+| RR median / IQR / range | 43.59 / 1.30 / 36.5–47.6 | 43.97 / 0.97 / 36.2–51.6 |
+| RRV reportable | **125 / 144 (87 %)** | **118 / 140 (84 %)** |
+| RRV RMSSD (median) | 327 ms | 334 ms |
 | HRV SDNN / RMSSD | 25.2 / 23.3 | 44.2 / 64.0 |
 
-**The second recording's inter-quartile range more than halved — 7.48 → 3.12
-/min — when ectopic-derived vertices stopped entering the surrogates.** That is
+**Reportable variability is 87 and 84 %, well above the 48 and 43 % of windows
+that carry a rate.** More than half the windows here have a single corroborating
+surrogate, so no rate is published for them; the period each would have reported
+is still used to narrow that window's breath intervals, which is all the
+variability figures need. Withholding it as well left both recordings at 49 %.
+
+**The second recording's inter-quartile range collapsed — 7.48 → 0.97 /min —
+once ectopic-derived vertices stopped entering the surrogates.** That is
 the clearest single effect of the change described in
 [`DESIGN.md`](DESIGN.md), "Ectopic beats do not reach the respiratory
 surrogates", and it is why the change was kept: the adult figures do not move at
 all, and the recordings carrying artefact tighten.
 
-**RR coverage is 51 %, and that is the gate working rather than failing.** With
+**RR coverage is 48 and 43 %, and that is the gate working rather than failing.**
+More than half the windows here carry a single corroborating surrogate, so no
+rate is published for them — but the period each would have reported still
+narrows that window's breath intervals, which is why reportable variability is
+far higher than coverage. With
 no breath annotations the test is self-consistency against each recording's own
 median rate: declined windows sit **2.82 and 3.64 /min** from it against **1.63
 and 0.80** for those kept, and are more than twice as likely to be over 5 /min
@@ -202,7 +221,9 @@ periodic breathing, not a chronic deficiency. Raising the threshold would
 readmit exactly those windows.
 
 **Better detection did not buy coverage.** Switching to IMS added 226 beats on
-the first recording and coverage went 67 % → 49 %; on the second, 48 % → 49 %.
+the first recording and coverage fell rather than rose; on the second it barely
+moved. Those figures were measured on the build of the day and are quoted here
+only for their direction.
 Detection is not the coverage bottleneck — the case for IMS here rests on rate
 and HRV, not on RR.
 
@@ -220,8 +241,8 @@ window is scaled to reach it, are in [`DESIGN.md`](DESIGN.md),
 
 | detector | med Se | med PPV | med F1 | worst F1 | settled RR MAE | within-2 | coverage |
 |:---|---:|---:|---:|---:|---:|---:|---:|
-| **TERMA — what `-s adult` selects** | 98.2 | **99.3** | **98.7** | **92.0** | **0.42** | **99 %** | **90 %** |
-| Karlen IMS (`-d ims`) | **98.4** | 95.0 | 96.6 | 87.2 | 0.68 | 95 % | 80 % |
+| **TERMA — what `-s adult` selects** | **98.5** | **99.7** | **99.0** | **94.1** | **0.42** | **99 %** | 83 % |
+| Karlen IMS (`-d ims`) | **98.4** | 95.0 | 96.6 | 87.0 | 0.64 | 95 % | 78 % |
 
 The gap widened once the harmonic guard was added: TERMA's cleaner estimates
 track well, while IMS's noisier ones trip the tracker more often and are
@@ -229,7 +250,7 @@ declined.
 
 This is the evidence for keeping the split rather than standardising on one
 detector: TERMA is meaningfully better on adults on every measure except raw
-sensitivity, and IMS pays for that sensitivity in precision (95.0 against 99.3).
+sensitivity, and IMS pays for that sensitivity in precision (95.0 against 99.7).
 
 On the neonatal pair the ranking reverses: IMS finds **96 %** of the expected
 beats against TERMA's 85–88 %, because it carries no window whose length must be
