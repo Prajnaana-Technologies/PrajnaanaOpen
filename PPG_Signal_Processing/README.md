@@ -73,6 +73,18 @@ the reported respiratory rate.
 **Every option, what to expect, and how to read the output columns:
 [`docs/USER_GUIDE.md`](docs/USER_GUIDE.md).**
 
+### The prebuilt Windows binary
+
+`ppg_analysis.exe` is committed at the root so the live monitor can be run on
+Windows without installing a compiler. It is a build of the `src/` sources in
+this repository — nothing more — compiled with MinGW-w64 GCC 16.1.0
+(`x86_64-ucrt-posix-seh`, from the WinLibs distribution). Its banner reports the
+version defined in `include/ppg_common.h`.
+
+Build it yourself if you would rather not run someone else's binary: `make` on
+Windows produces this file from the same sources. The committed copy is a
+convenience, and the sources are what this project asks to be read.
+
 ## What makes this different
 
 **Every constant traces to a paper — or says plainly that it doesn't.**
@@ -274,6 +286,7 @@ PPG_Signal_Processing/
 │   └── img/     generated figures (plain SVG, no drawing tool required)
 ├── Monitor/     the live display, its two documents, and two sample recordings
 ├── Makefile     `make` builds it — other targets are situational
+├── ppg_analysis.exe   a Windows build of the above — see Quick start
 ├── LICENSE      Apache-2.0
 └── NOTICE       attribution and the not-a-medical-device statement
 ```
