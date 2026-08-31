@@ -229,6 +229,40 @@ desktop session without further system packages.
 | [`Monitor/User_Guide_PPG_SignalMonitoring.pdf`](Monitor/User_Guide_PPG_SignalMonitoring.pdf) | installing and running the monitor, and what each card shows |
 | [`Monitor/TechDoc_PPG_SignalMonitoring.pdf`](Monitor/TechDoc_PPG_SignalMonitoring.pdf) | how it is built and how it joins the two row shapes on the stream |
 
+### The Android demo app
+
+`Monitor/PPG_Android_App/` is a sample demonstration app: the same analysis
+running on an Android phone instead of a desktop. `libppgmonitor.so` inside the
+APK is this project's engine compiled for the four Android ABIs, and the app
+shows heart rate, respiratory rate, the variability figures and both waveforms
+with the detector's marks on them, as the desktop monitor does.
+
+The phone reads no sensor. A laptop streams a recording to it over Bluetooth
+Classic (SPP/RFCOMM) and the phone analyses the samples as they arrive — the app
+listens, the laptop connects.
+
+| | |
+|:---|:---|
+| `PPG_MobileApp.apk` | the application |
+| `python_sources/send_bt.py` | streams from a Linux laptop — needs `pybluez2` |
+| `python_sources/send_bt_win.py` | streams from a Windows laptop, over a virtual COM port — needs `pyserial` |
+| [`PPG_Android_App/User_GUide_PPG_Mobile_App.pdf`](Monitor/PPG_Android_App/User_GUide_PPG_Mobile_App.pdf) | pairing, installing, and reading the display |
+
+Each sender is one self-contained file. It works out the input scale from the
+recording by the same rule the engine uses for `-nu auto`, states that scale
+rather than picking one quietly, and paces the samples at the sampling rate. The
+rate and the patient type travel in a header line ahead of them, so the app
+follows both without a rebuild. `--subject` is required: it selects the beat
+detector and the heart-rate band, and a wrong one is silent.
+
+What the APK is, exactly: a demonstration build carrying the engine from this
+repository — the library inside it reports the version defined in
+`include/ppg_common.h`, as the Windows binary does — signed with the standard
+Android debug key and packaged as `com.example.ppgmonitor`. It is here to show
+the analysis running on a phone; the app's own Android sources are not part of
+this repository, and it is not offered as a distributable application. Install it
+as the guide describes.
+
 ## Known limitations
 
 Stated plainly because they bound what the outputs mean:
@@ -275,6 +309,7 @@ behind them are in [`docs/RESULTS.md`](docs/RESULTS.md) and the reasoning in
 | [`CREDITS.md`](CREDITS.md) | every research paper and dataset used, with DOI links, and the people who contributed |
 | [`Monitor/User_Guide_PPG_SignalMonitoring.pdf`](Monitor/User_Guide_PPG_SignalMonitoring.pdf) | the live monitor: installing it, running it, and reading its display |
 | [`Monitor/TechDoc_PPG_SignalMonitoring.pdf`](Monitor/TechDoc_PPG_SignalMonitoring.pdf) | the live monitor: how it is built and how it consumes the plot stream |
+| [`Monitor/PPG_Android_App/User_GUide_PPG_Mobile_App.pdf`](Monitor/PPG_Android_App/User_GUide_PPG_Mobile_App.pdf) | the Android demo app: pairing, installing, and reading its display |
 
 ## Layout
 
@@ -284,7 +319,8 @@ PPG_Signal_Processing/
 ├── include/     ppg_common.h · ppg_fiducial.h · filter_bands.h
 ├── docs/        user guide, results, architecture, engineering record, contract
 │   └── img/     generated figures (plain SVG, no drawing tool required)
-├── Monitor/     the live display, its two documents, and two sample recordings
+├── Monitor/     the live display, its documents, and two sample recordings
+│   └── PPG_Android_App/   the same analysis on a phone — a demo, see Live monitor
 ├── Makefile     `make` builds it — other targets are situational
 ├── ppg_analysis.exe   a Windows build of the above — see Quick start
 ├── LICENSE      Apache-2.0
