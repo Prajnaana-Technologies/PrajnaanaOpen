@@ -10,6 +10,18 @@ Please refer to the individual project directories for detailed documentation, i
 
 ---
 
+## 📦 Projects
+
+| Project | What it is |
+|:---|:---|
+| **[PPG_Signal_Processing](PPG_Signal_Processing)** | Heart rate, heart-rate variability, respiratory rate and respiratory-rate variability from a single photoplethysmogram channel. Portable C99 with no dependency beyond `libm`; one binary serves neonates through adults, and a live desktop monitor and an Android demo app come with it. |
+| **[RPC_ReferenceFramework](RPC_ReferenceFramework)** | A multi-core RPC framework in C. A generator reads your function prototypes and emits the marshalling stubs and dispatch tables, so code on one core, process or machine calls a function that lives on another without hand-writing socket or buffer handling. Transport is TCP, and two Android projects put a core on a phone behind an AIDL service. |
+| **[Vehicle_CAN_Simulator](Vehicle_CAN_Simulator)** | A vehicle simulator that drives itself along real road routes and emits realistic CAN bus traffic while it does, so automotive electronics can be developed and tested without a car, a driver, or a road. |
+
+Each project directory carries its own documentation, build instructions and licence.
+
+---
+
 ## 🛠️ Engineering Areas
 
 The projects in this repository reflect areas of engineering in which Prajnaana has practical product-development experience, including:
