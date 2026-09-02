@@ -73,11 +73,9 @@ If a project in this repository is relevant to your product or engineering chall
 
 ## 📜 License
 
-Unless otherwise specified in an individual project directory, the software in this repository is released under the **MIT License**.
+Each project directory in this repository carries its own `LICENSE` file, and those are the terms that govern that project. They are not the same for every project, so read the one beside the code you intend to use.
 
-See the [`LICENSE`](LICENSE) file for the complete license terms.
-
-Individual projects may contain additional notices regarding third-party libraries, data, or other dependencies. Please review the project-specific documentation before redistribution or commercial use.
+Individual projects may also contain additional notices regarding third-party libraries, data, or other dependencies. Please review the project-specific documentation before redistribution or commercial use.
 
 ---
 
