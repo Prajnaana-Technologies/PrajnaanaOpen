@@ -1,5 +1,17 @@
 # AI Vehicle CAN Simulator
 
+## Why use a Vehicle CAN Simulator?
+
+**How do you develop and test automotive CAN software without continuous access to a vehicle, ECU hardware or a test track?**
+
+The **AI Vehicle CAN Simulator** provides a software-based vehicle environment that generates realistic, continuously changing CAN traffic from real road routes. It enables engineers to develop, test and demonstrate automotive software in a **repeatable and controllable environment**, reducing dependency on physical vehicles during development and validation.
+
+It can support **automotive ECU development, CAN application testing, integration testing, diagnostics development, demonstrations, training and research**.
+
+The technical details of the simulator are described below.
+
+---
+
 A vehicle simulator that drives itself along **real road routes** and emits
 **realistic CAN bus traffic** while it does — so you can develop and test
 automotive electronics without a car, a driver, or a road.
