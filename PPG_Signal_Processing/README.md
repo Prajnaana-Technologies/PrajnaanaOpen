@@ -1,5 +1,19 @@
 # ppg_analysis
 
+## Why use this PPG signal-processing framework?
+
+**How can you extract heart rate, heart-rate variability, respiratory rate and respiratory-rate variability from a single PPG signal — without building the entire signal-processing pipeline from scratch?**
+
+PPG-based sensing is widely used in wearable, mobile and monitoring applications, but turning a raw optical signal into reliable physiological metrics requires filtering, beat detection, respiratory estimation and validation across different subject types.
+
+The **PPG Signal Processing** project provides a portable C99 reference implementation that brings these processing stages together in a single, dependency-light engine. It can help engineers **prototype PPG-based applications, evaluate signal-processing approaches, integrate algorithms into embedded or mobile systems, and build on a documented and research-backed implementation**.
+
+The project also includes desktop and Android demonstrations, making the processing pipeline easier to evaluate across development environments.
+
+The technical details, validation scope and limitations are described below.
+
+---
+
 Heart rate, heart-rate variability, respiratory rate and respiratory-rate
 variability from a single photoplethysmogram channel.
 
