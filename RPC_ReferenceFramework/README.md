@@ -1,5 +1,19 @@
 # Multi-Core RPC Framework
 
+## Why use an RPC Framework?
+
+**How do you make software running on different CPU cores, processes or machines communicate as easily as calling a local function?**
+
+In multi-core and distributed automotive systems, applications often need to invoke functionality across execution boundaries. Hand-writing message formats, socket communication, marshalling and dispatch logic for every function increases development effort and creates maintenance overhead.
+
+The **Multi-Core RPC Framework** automates this communication layer. Engineers declare a remote function once, and the framework generates the client and server stubs needed to marshal, transport, demarshal and dispatch the call. This allows teams to **simplify cross-core communication, reduce repetitive IPC code and accelerate integration of distributed software components**.
+
+The framework is applicable to **multi-core embedded systems, automotive software, distributed applications, prototyping and IPC development**, with TCP used as the transport in this implementation.
+
+The technical details of the framework are described below.
+
+---
+
 ## Who This Is For
 
 C developers who want code on one core (or process, or machine) to call a function
