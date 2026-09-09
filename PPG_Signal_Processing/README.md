@@ -1,18 +1,41 @@
 # ppg_analysis
 
-## Why use this PPG signal-processing framework?
+## How do you turn a raw PPG signal into reliable heart-rate and respiratory metrics?
 
-**How can you extract heart rate, heart-rate variability, respiratory rate and respiratory-rate variability from a single PPG signal — without building the entire signal-processing pipeline from scratch?**
+**Challenge**
 
-PPG-based sensing is widely used in wearable, mobile and monitoring applications, but turning a raw optical signal into reliable physiological metrics requires filtering, beat detection, respiratory estimation and validation across different subject types.
+PPG-based sensing is widely used in wearable, mobile and monitoring applications, but turning a raw optical signal into reliable physiological metrics — heart rate, heart-rate variability, respiratory rate and respiratory-rate variability — requires filtering, beat detection, respiratory estimation and validation across very different subject types. Building that whole pipeline from scratch is a large, research-heavy effort.
 
-The **PPG Signal Processing** project provides a portable C99 reference implementation that brings these processing stages together in a single, dependency-light engine. It can help engineers **prototype PPG-based applications, evaluate signal-processing approaches, integrate algorithms into embedded or mobile systems, and build on a documented and research-backed implementation**.
+**Our approach**
 
-The project also includes desktop and Android demonstrations, making the processing pipeline easier to evaluate across development environments.
+Prajnaana developed a portable, dependency-light C99 reference engine that brings filtering, beat detection, HR/HRV analysis and respiratory estimation together in one place — with every constant traced to published research and validated against annotated clinical recordings, plus desktop and Android demonstrations.
 
-The technical details, validation scope and limitations are described below.
+**Engineering demonstrated**
+
+- Biomedical signal processing
+- Portable embedded C (C99)
+- Algorithm design and validation
+- Beat / fiducial detection
+- Spectral analysis
+- Cross-platform (desktop + Android) demonstration
+- AI-assisted engineering
+
+**Where this can help**
+
+- Wearable and mobile health devices
+- Patient monitoring systems
+- PPG algorithm prototyping
+- Embedded biomedical firmware
+- Physiological signal research
+- Sensor evaluation and tuning
+
+> 💡 **Have a similar engineering challenge?**
+>
+> **Talk to Prajnaana about your problem.**
 
 ---
+
+## Overview
 
 Heart rate, heart-rate variability, respiratory rate and respiratory-rate
 variability from a single photoplethysmogram channel.
