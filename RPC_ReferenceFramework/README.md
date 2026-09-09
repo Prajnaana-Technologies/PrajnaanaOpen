@@ -1,16 +1,48 @@
 # Multi-Core RPC Framework
 
-## Why use an RPC Framework?
+## How do you make code on different cores or machines call each other like a local function?
 
-**How do you make software running on different CPU cores, processes or machines communicate as easily as calling a local function?**
+**Challenge**
 
-In multi-core and distributed automotive systems, applications often need to invoke functionality across execution boundaries. Hand-writing message formats, socket communication, marshalling and dispatch logic for every function increases development effort and creates maintenance overhead.
+In multi-core and distributed automotive systems, applications need to invoke functionality across execution boundaries. Hand-writing message formats, socket communication, marshalling and dispatch logic for every function increases development effort and creates maintenance overhead.
 
-The **Multi-Core RPC Framework** automates this communication layer. Engineers declare a remote function once, and the framework generates the client and server stubs needed to marshal, transport, demarshal and dispatch the call. This allows teams to **simplify cross-core communication, reduce repetitive IPC code and accelerate integration of distributed software components**.
+**Our approach**
 
-The framework is applicable to **multi-core embedded systems, automotive software, distributed applications, prototyping and IPC development**, with TCP used as the transport in this implementation.
+Prajnaana developed a code-generating RPC framework where a remote function is declared once, and the client and server stubs — marshalling, transport, demarshalling and dispatch — are generated automatically, communicating across three cores over TCP through a central hub relay.
 
-The technical details of the framework are described below.
+**Engineering demonstrated**
+
+- Remote procedure call design
+- Inter-core / inter-process communication (IPC)
+- Code generation (Python → C)
+- Marshalling and serialization
+- TCP networking
+- OS abstraction layer design
+- Android integration
+- AI-assisted engineering
+
+**Where this can help**
+
+- Multi-core embedded systems
+- Automotive software integration
+- Distributed applications
+- IPC and middleware development
+- Rapid prototyping of cross-core services
+- Android-to-native communication
+
+> 💡 **Have a similar engineering challenge?**
+>
+> **Talk to Prajnaana about your problem.**
+
+---
+
+## Overview
+
+A multi-core RPC framework for C. You declare a remote function once, and a Python
+generator writes the client and server stubs that marshal, transport, demarshal and
+dispatch the call. Three cores communicate over TCP, with one core acting as a hub
+that relays traffic between the others — so application code calls a remote function
+exactly as it would a local one.
 
 ---
 
