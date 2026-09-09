@@ -1,8 +1,8 @@
 # PrajnaanaOpen
 
-PrajnaanaOpen is a collection of selected software tools, algorithms, and reference implementations developed by **Prajnaana** as part of our embedded product engineering work.
+PrajnaanaOpen is a collection of selected software tools, algorithms, and reference implementations developed by **Prajnaana** as part of our embedded product engineering work — shared openly because engineering capability is best demonstrated through working technology.
 
-The projects in this repository are made available as open-source software to encourage experimentation, learning, reuse, and integration into engineering workflows.
+The projects are made available as open-source software so that engineers and organizations can explore practical implementations, experiment with the technology, reuse components, evaluate approaches for their own applications, and build prototypes and proof-of-concepts.
 
 Our focus is on practical solutions for **Automotive, Industrial, Medical, and Connected Device** applications.
 
@@ -22,64 +22,20 @@ Each project directory carries its own documentation, build instructions and lic
 
 ---
 
-## 🛠️ Engineering Areas
-
-The projects in this repository reflect areas of engineering in which Prajnaana has practical product-development experience, including:
-
-* Embedded Systems
-* Embedded Linux
-* Android
-* QNX
-* Automotive Software
-* CAN / Vehicle Communication
-* Signal Processing and Algorithms
-* Connectivity
-* System Integration
-* Test and Validation Engineering
-* Medical and Wearable Systems
-* Connected Devices
-
-The repository is intended to provide **working examples of engineering capabilities**, rather than simply describing them.
-
----
-
-## 💡 Why PrajnaanaOpen?
-
-At Prajnaana, we believe that engineering capability is best demonstrated through working technology.
-
-The projects in this repository represent selected examples of solutions developed by our engineering teams. We are making these technologies available openly so that engineers and organizations can:
-
-* Explore practical implementations
-* Experiment with the technology
-* Reuse components in their own projects
-* Evaluate approaches for their applications
-* Build prototypes and proof-of-concepts
-* Gain insight into the engineering capabilities behind the projects
-
----
-
 ## 🤝 Need Engineering Support?
 
-The projects in this repository are intended to be useful on their own. However, integrating a technology into a production product often requires additional engineering work.
+These projects are open-source reference implementations. Moving one into a
+production product may require application-specific adaptation, integration,
+validation and optimization. Prajnaana Technologies has practical experience
+across these stages of embedded product engineering. If a project in this
+repository is relevant to your product or engineering challenge, we would be
+happy to discuss how Prajnaana can help adapt, integrate, and productize the
+technology for your needs.
 
-Prajnaana provides **end-to-end embedded product engineering services**, from system architecture and platform engineering through software development, algorithms, integration, validation, and product lifecycle support.
+**Prajnaana Technologies**
+Automotive • Industrial • Medical • Connected Devices • Embedded Systems
 
-Our engineering services include:
-
-* Technology evaluation and feasibility studies
-* Proof-of-concept development
-* Product-specific customization
-* Embedded software development
-* Algorithm development and optimization
-* Hardware/software integration
-* Platform and middleware development
-* System integration
-* Test automation and validation
-* Production productization
-
-If a project in this repository is relevant to your product or engineering challenge, **we would be happy to discuss how Prajnaana can help adapt, integrate, and productize the technology for your needs.**
-
-**[Visit Prajnaana →](https://www.prajnaanatech.com/)**
+**[www.prajnaanatech.com →](https://www.prajnaanatech.com/)**
 
 ---
 
@@ -88,23 +44,6 @@ If a project in this repository is relevant to your product or engineering chall
 Each project directory in this repository carries its own `LICENSE` file, and those are the terms that govern that project. They are not the same for every project, so read the one beside the code you intend to use.
 
 Individual projects may also contain additional notices regarding third-party libraries, data, or other dependencies. Please review the project-specific documentation before redistribution or commercial use.
-
----
-
-## 🏢 About Prajnaana
-
-**Prajnaana Technologies** is an embedded product engineering company based in **Bengaluru, India**, providing engineering services for complex connected products.
-
-Our engineering expertise spans:
-
-**Automotive • Industrial • Medical • Connected Devices**
-
-We work with product companies to design, develop, integrate, test, and evolve embedded products and connected systems.
-
-**Prajnaana Technologies**
-Bengaluru, India
-
-**[Website →](https://www.prajnaanatech.com/)**
 
 ---
 
