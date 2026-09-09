@@ -24,9 +24,9 @@ Each project directory carries its own documentation, build instructions and lic
 
 ## 🤝 Need Engineering Support?
 
-These projects are open-source reference implementations. Moving one into a
+These projects are open-source reference implementations. **Moving one into a
 production product may require application-specific adaptation, integration,
-validation and optimization. Prajnaana Technologies has practical experience
+validation and optimization**. Prajnaana Technologies has practical experience
 across these stages of embedded product engineering. If a project in this
 repository is relevant to your product or engineering challenge, we would be
 happy to discuss how Prajnaana can help adapt, integrate, and productize the
