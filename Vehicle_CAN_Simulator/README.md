@@ -1,16 +1,40 @@
 # AI Vehicle CAN Simulator
 
-## Why use a Vehicle CAN Simulator?
+## How do you test automotive CAN software without a vehicle?
 
-**How do you develop and test automotive CAN software without continuous access to a vehicle, ECU hardware or a test track?**
+**Challenge**
 
-The **AI Vehicle CAN Simulator** provides a software-based vehicle environment that generates realistic, continuously changing CAN traffic from real road routes. It enables engineers to develop, test and demonstrate automotive software in a **repeatable and controllable environment**, reducing dependency on physical vehicles during development and validation.
+Physical vehicle testing is expensive, difficult to automate and not always available during early software development.
 
-It can support **automotive ECU development, CAN application testing, integration testing, diagnostics development, demonstrations, training and research**.
+**Our approach**
 
-The technical details of the simulator are described below.
+Prajnaana developed a software-based vehicle simulation environment capable of generating realistic, continuously changing CAN traffic based on real road routes — letting engineers develop, test and demonstrate automotive software in a repeatable and controllable environment.
+
+**Engineering demonstrated**
+
+- CAN communication
+- Vehicle signal simulation
+- Automotive software
+- Simulation
+- Test infrastructure
+- AI-assisted engineering
+
+**Where this can help**
+
+- ECU development
+- CAN application development
+- Automated testing
+- HIL/SIL environments
+- Diagnostics development
+- Automotive middleware testing
+
+> 💡 **Have a similar engineering challenge?**
+>
+> **Talk to Prajnaana about your problem.**
 
 ---
+
+## Overview
 
 A vehicle simulator that drives itself along **real road routes** and emits
 **realistic CAN bus traffic** while it does — so you can develop and test
@@ -20,9 +44,6 @@ You give it a start and a destination. It fetches the real driving route,
 then simulates a car travelling that route end to end, producing live speed,
 engine RPM, temperature, steering angle, climate and weather values, and
 transmitting them as CAN frames over PCAN hardware or a virtual bus.
-
-Think of it as a flight simulator for a car, where the computer drives and
-you watch the signals.
 
 ---
 
