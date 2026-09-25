@@ -1,0 +1,10 @@
+# Optional. HA_AI=llm lets a model plan the regression instead of the
+# threshold rules. Not needed for a normal run.
+#
+# Only the Anthropic engine needs a package. The Gemini engine
+# (HA_AI=llm with HA_ENGINE=gemini) speaks HTTP through the standard
+# library, so it needs nothing beyond requirements.txt.
+-r requirements.txt
+# Adaptive thinking and structured outputs; older SDKs reject them at call
+# time and the run degrades to the rules. Mirrors llm_client.MIN_SDK_VERSION.
+anthropic>=0.105

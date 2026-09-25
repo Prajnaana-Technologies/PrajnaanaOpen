@@ -1,0 +1,4 @@
+# Everything needed to run the regression suite against the device.
+numpy>=1.24
+pytest>=7.4
+bleak>=0.21        # BLE transport

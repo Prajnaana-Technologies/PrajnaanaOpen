@@ -1,0 +1,32 @@
+# Line endings.
+#
+# core.autocrlf alone is a per-machine setting, so the same commit checked
+# out on Windows and on Linux could differ. The firmware build id does not
+# depend on that: CMakeLists.txt normalises CRLF to LF before hashing, so
+# the same commit gives the same id from either checkout. This file is here
+# so the repository itself is consistent for everyone who clones it.
+
+* text=auto eol=lf
+
+# Build output is NOT normalised. bin/ is what PyInstaller produced, and
+# the notices file carries third-party licence texts exactly as their
+# authors shipped them -- several use CRLF. Rewriting either would change
+# bytes we redistribute and claim to reproduce verbatim.
+bin/** -text
+
+# Firmware images are delivered artefacts and are compared by hash.
+*.hex -text
+*.bin -text
+
+# Binary by content; listed so no heuristic has to guess.
+*.exe   binary
+*.dll   binary
+*.pyd   binary
+*.zip   binary
+*.pdf   binary
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.wav   binary
+*.docx  binary
+*.elf   binary

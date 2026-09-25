@@ -1,0 +1,106 @@
+{
+  "applied_thresholds": {
+    "memory": 3.76
+  },
+  "build_id": "fw-2026-09-11-telemetry-v2",
+  "ceilings": {
+    "memory": 4.0
+  },
+  "combined": {
+    "memory": {
+      "first": 3.53,
+      "last": 3.53,
+      "max": 3.53,
+      "mean": 3.53,
+      "measured": true,
+      "min": 3.53,
+      "rising": false,
+      "samples": 24
+    },
+    "power": {
+      "measured": false,
+      "samples": 0
+    },
+    "retry": {
+      "first": 6,
+      "last": 7,
+      "max": 7,
+      "mean": 6.5,
+      "measured": true,
+      "min": 6,
+      "rising": true,
+      "samples": 24
+    },
+    "sync": {
+      "measured": false,
+      "samples": 0
+    }
+  },
+  "cycles_per_phase": 12,
+  "headroom_factor": 1.15,
+  "idle": {
+    "memory": {
+      "first": 3.53,
+      "last": 3.53,
+      "max": 3.53,
+      "mean": 3.53,
+      "measured": true,
+      "min": 3.53,
+      "rising": false,
+      "samples": 12
+    },
+    "power": {
+      "measured": false,
+      "samples": 0
+    },
+    "retry": {
+      "first": 6,
+      "last": 6,
+      "max": 6,
+      "mean": 6.0,
+      "measured": true,
+      "min": 6,
+      "rising": false,
+      "samples": 12
+    },
+    "sync": {
+      "measured": false,
+      "samples": 0
+    }
+  },
+  "loaded": {
+    "memory": {
+      "first": 3.53,
+      "last": 3.53,
+      "max": 3.53,
+      "mean": 3.53,
+      "measured": true,
+      "min": 3.53,
+      "rising": false,
+      "samples": 12
+    },
+    "power": {
+      "measured": false,
+      "samples": 0
+    },
+    "retry": {
+      "first": 7,
+      "last": 7,
+      "max": 7,
+      "mean": 7.0,
+      "measured": true,
+      "min": 7,
+      "rising": false,
+      "samples": 12
+    },
+    "sync": {
+      "measured": false,
+      "samples": 0
+    }
+  },
+  "notes": "memory is work-queue stack high-water in KiB against a 4.00 KiB stack. It plateaued at 3.53 in all 24 samples, idle and loaded. retry counts link drops since boot including harness-initiated disconnects, so no absolute threshold is derivable.",
+  "proposed_thresholds": {
+    "memory": 3.76,
+    "retry": null
+  }
+}

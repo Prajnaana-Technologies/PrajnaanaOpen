@@ -1,0 +1,168 @@
+# Copyright (c) 2026 Prajnaana Technologies Pvt. Ltd.
+# SPDX-License-Identifier: MIT
+#
+# Two jobs, because a hosted runner is a virtual machine with no radio.
+#
+#   host      runs anywhere. Unit tests, the secret gate, generated-suite
+#             acceptance rules. This is what gates a pull request.
+#
+#   hardware  runs only on a self-hosted runner with a board attached, and
+#             is what makes "continuous regression" mean anything for a
+#             hardware project. Without it the suite never touches a device,
+#             and the claim is only half true.
+#
+# Setting up the hardware runner (one machine, once):
+#   1. Settings -> Actions -> Runners -> New self-hosted runner
+#   2. Label it: bench, ble
+#   3. Attach the nRF board and confirm: python src/tools/ble_probe.py
+#   4. Leave the runner service running
+#
+# Until that exists the hardware job does not run. It is not skipped: with
+# no runner carrying those labels it stays QUEUED, and the workflow does not
+# finish rather than quietly passing with nothing exercised. That is
+# deliberate -- a green tick with no device touched is the failure this
+# workflow exists to prevent.
+
+name: regression
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      build_id:
+        description: "Firmware build id (two runs sharing one are compared for the determinism KPI)"
+        required: false
+        default: ""
+
+jobs:
+  host:
+    name: host-only suite
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install
+        working-directory: src
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # Runs before the tests on purpose: a leaked credential is worth
+      # failing for even if everything else is green.
+      - name: Secret gate
+        run: python src/tools/scan_secrets.py --path . --quiet
+
+      - name: Unit and contract tests
+        working-directory: src
+        run: python -m pytest tests/ -q
+
+      # Generation needs no hardware, so the acceptance rules can be enforced
+      # on every push even though the tests themselves cannot run here.
+      - name: Generate a suite and enforce acceptance rules
+        working-directory: src
+        env:
+          HA_AI: rules
+        run: |
+          python -c "from regression.ai_engine.generate_tests import generate_tests; generate_tests({'unmeasured': ['power', 'memory', 'sync', 'retry']}, 'ci smoke')"
+          python -m regression.governance validate
+
+      - name: Coverage by category
+        working-directory: src
+        run: python -m regression.catalog
+
+  hardware:
+    name: hardware suite
+    needs: host
+    # Only on the bench machine. A hosted runner has no BLE peer, so running
+    # this there would fail for a reason that has nothing to do with the code.
+    runs-on: [self-hosted, bench, ble]
+    if: github.event_name != 'pull_request'
+
+    steps:
+      # clean: false, because checkout otherwise runs git clean -ffdx and
+      # deletes the gitignored approval store
+      # (src/regression/artifacts/governance/approvals.json). With it gone,
+      # HA_REQUIRE_APPROVAL=1 below can never pass, however carefully
+      # someone approved the suite on the bench.
+      - uses: actions/checkout@v4
+        with:
+          clean: false
+
+      - name: Install
+        working-directory: src
+        run: pip install -r requirements.txt
+
+      - name: Confirm a board is present
+        working-directory: src
+        run: python tools/ble_probe.py
+
+      # HA_REQUIRE_APPROVAL refuses an unreviewed suite -- the right setting
+      # for a result anyone will quote.
+      #
+      # HA_REQUIRE_TELEMETRY turns a missing telemetry reading into an error
+      # rather than a degraded run, so firmware that stopped publishing
+      # cannot produce a clean-looking result. It insists only on
+      # REQUIRED_METRICS (regression/ble/ble_audio.py: memory, retry) -- the
+      # metrics this board actually reports. Power and sync stay unmeasured
+      # by design on a DK (no current sensor, no second device) and are not
+      # required.
+      - name: Regression run
+        working-directory: src
+        env:
+          HA_AI: rules
+          HA_REQUIRE_APPROVAL: "1"
+          HA_REQUIRE_TELEMETRY: "1"
+          # Only what a dispatch explicitly asked for. HA_BUILD_ID
+          # overrides the board (orchestrator.resolve_build_id), so setting
+          # it to github.sha on every run labelled the results with a commit
+          # rather than with the image actually flashed. Left empty, the
+          # board identifies itself.
+          HA_BUILD_ID: ${{ github.event.inputs.build_id }}
+          # Through the environment, never interpolated into the script.
+          # ${{ }} is substituted before the shell parses the line, so a
+          # commit message carrying a quote and a semicolon would run as
+          # commands -- here on a self-hosted runner with a board attached.
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message || 'manual run' }}
+        run: python -m regression.ai_engine.orchestrator --change "$COMMIT_MESSAGE"
+
+      # A second run of the same build is the determinism measurement. It is
+      # the cheapest KPI and every other one depends on it: if two runs of one
+      # build disagree, no later number is computed over reliable verdicts.
+      - name: Repeat run for determinism
+        working-directory: src
+        env:
+          HA_AI: rules
+          HA_REQUIRE_APPROVAL: "1"
+          HA_REQUIRE_TELEMETRY: "1"
+          HA_BUILD_ID: ${{ github.event.inputs.build_id }}
+          # The SAME change text as the first run. Determinism compares two
+          # runs of one build, and the change description is a plan input:
+          # passing "determinism repeat" here made the second run plan from
+          # different words, so a disagreement could come from the input
+          # rather than from the device.
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message || 'manual run' }}
+        run: python -m regression.ai_engine.orchestrator --change "$COMMIT_MESSAGE"
+
+      - name: KPIs and trend
+        working-directory: src
+        if: always()
+        run: |
+          python -m regression.kpi report
+          python -m regression.analytics.trend
+
+      - name: Publish artefacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: regression-artefacts
+          path: |
+            src/regression/logs/
+            src/regression/artifacts/
+          retention-days: 30

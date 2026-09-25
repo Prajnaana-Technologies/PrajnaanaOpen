@@ -1,0 +1,48 @@
+/*
+ * Copyright (c) 2026 Prajnaana Technologies Pvt. Ltd.
+ * SPDX-License-Identifier: MIT
+ *
+ * Supply voltage on the SAADC, so battery level is measured rather than
+ * declared.
+ *
+ * The DK has no battery and no fuel gauge. What it does have is a supply
+ * rail the SoC can measure through the SAADC's internal VDD input, needing
+ * no external part and no pin. That is a real quantity that moves when the
+ * supply moves, which is enough for the read path, the Battery Service and
+ * the tests around them to be exercised honestly.
+ *
+ * It is not a state of charge. A product would read a fuel gauge and get
+ * one; this reports where the rail sits between a brown-out floor and a
+ * charged-cell ceiling -- HA_RAIL_EMPTY_MV and HA_RAIL_FULL_MV in
+ * src/ble_telemetry_service.c -- and the firmware says so where it converts.
+ */
+
+#include <zephyr/dt-bindings/adc/adc.h>
+#include <zephyr/dt-bindings/adc/nrf-adc.h>
+
+/ {
+	zephyr,user {
+		io-channels = <&adc 0>;
+	};
+};
+
+&adc {
+	status = "okay";
+	#address-cells = <1>;
+	#size-cells = <0>;
+
+	channel@0 {
+		reg = <0>;
+
+		/*
+		 * Gain 1/6 against the 0.6 V internal reference gives a 3.6 V
+		 * full scale, which covers the whole range a supply rail can
+		 * sit in without clipping the top of it.
+		 */
+		zephyr,gain = "ADC_GAIN_1_6";
+		zephyr,reference = "ADC_REF_INTERNAL";
+		zephyr,acquisition-time = <ADC_ACQ_TIME(ADC_ACQ_TIME_MICROSECONDS, 10)>;
+		zephyr,input-positive = <NRF_SAADC_VDD>;
+		zephyr,resolution = <12>;
+	};
+};
